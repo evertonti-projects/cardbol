@@ -34,13 +34,41 @@
         loop
     ></audio>
 
+    <div id="openingDisplayChoices" class="opening-display-choices">
+        <div class="opening-display-title">COMO DESEJA JOGAR?</div>
+
+        <div class="opening-display-buttons">
+            <button
+                id="openingFullscreenChoice"
+                class="opening-display-button fullscreen-choice"
+                type="button"
+                onclick="chooseOpeningDisplayMode('fullscreen')"
+            >
+                <span class="opening-display-icon">⛶</span>
+                <span>TELA CHEIA</span>
+                <small>Mais espaço para o campo</small>
+            </button>
+
+            <button
+                id="openingNormalChoice"
+                class="opening-display-button normal-choice"
+                type="button"
+                onclick="chooseOpeningDisplayMode('normal')"
+            >
+                <span class="opening-display-icon">▣</span>
+                <span>MODO NORMAL</span>
+                <small>Manter navegador visível</small>
+            </button>
+        </div>
+    </div>
+
     <button
         id="openingPlayButton"
-        class="opening-play-button ready"
+        class="opening-play-button"
         type="button"
         onclick="handleOpeningButton()"
     >
-        ▶ INICIAR APRESENTAÇÃO
+        ⚽ BATER UMA PELADA
     </button>
 </div>
 

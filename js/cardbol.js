@@ -8523,6 +8523,61 @@ function hideOpeningPlayButton() {
     button.style.pointerEvents = "none";
 }
 
+function showOpeningDisplayChoices() {
+    const choices = document.getElementById("openingDisplayChoices");
+    if(!choices) return;
+
+    choices.classList.remove("hidden");
+    choices.setAttribute("aria-hidden", "false");
+}
+
+function hideOpeningDisplayChoices() {
+    const choices = document.getElementById("openingDisplayChoices");
+    if(!choices) return;
+
+    choices.classList.add("hidden");
+    choices.setAttribute("aria-hidden", "true");
+}
+
+function requestOpeningFullscreen() {
+    const root = document.documentElement;
+
+    try {
+        if(getFullscreenElement()) {
+            updateFullscreenButton();
+            return;
+        }
+
+        if(root.requestFullscreen) {
+            const promise = root.requestFullscreen();
+            if(promise && typeof promise.catch === "function") {
+                promise.catch(() => {
+                    // Alguns navegadores móveis não permitem fullscreen
+                    // em páginas comuns. A apresentação continua normalmente.
+                });
+            }
+        } else if(root.webkitRequestFullscreen) {
+            root.webkitRequestFullscreen();
+        }
+    } catch(error) {
+        // Não interrompe a apresentação se fullscreen não for suportado.
+    }
+}
+
+function chooseOpeningDisplayMode(mode) {
+    if(openingPresentationStarted) return;
+
+    hideOpeningDisplayChoices();
+
+    // As duas ações abaixo acontecem diretamente dentro do clique do usuário.
+    // Isso preserva a permissão do navegador tanto para áudio quanto para fullscreen.
+    if(mode === "fullscreen") {
+        requestOpeningFullscreen();
+    }
+
+    startOpeningPresentation();
+}
+
 function startOpeningPresentation() {
     if(openingPresentationStarted) return;
 
@@ -8533,6 +8588,7 @@ function startOpeningPresentation() {
 
     openingPresentationStarted = true;
     openingPresentationFinished = false;
+    hideOpeningDisplayChoices();
     hideOpeningPlayButton();
 
     video.muted = true;
@@ -8618,8 +8674,11 @@ function initOpeningScreen() {
     openingPresentationStarted = false;
     openingPresentationFinished = false;
 
-    // Primeiro clique obrigatório para liberar áudio no navegador.
-    revealOpeningPlayButton("▶ INICIAR APRESENTAÇÃO");
+    // A escolha entre TELA CHEIA e MODO NORMAL é agora o primeiro clique.
+    // Esse gesto já libera o áudio do navegador e, quando escolhido,
+    // também solicita fullscreen.
+    hideOpeningPlayButton();
+    showOpeningDisplayChoices();
 
     // Ao terminar, o vídeo fica naturalmente parado no último frame.
     // O áudio continua em loop até BATER UMA PELADA ser clicado.
@@ -8631,11 +8690,6 @@ function initOpeningScreen() {
 }
 
 function handleOpeningButton() {
-    if(!openingPresentationStarted) {
-        startOpeningPresentation();
-        return;
-    }
-
     if(openingPresentationFinished) {
         enterCardBolGame();
     }

@@ -3583,3 +3583,171 @@ button.bench-carousel-item:hover {
     .info-panel { height:27px !important; }
     .message { min-height:21px !important; height:21px !important; font-size:6px !important; }
 }
+/* =========================================================
+   ABERTURA — ESCOLHA TELA CHEIA / MODO NORMAL
+========================================================= */
+.opening-display-choices {
+    position: relative;
+    z-index: 4;
+    align-self: flex-end;
+    width: min(720px, calc(100vw - 28px));
+    margin: 0 auto clamp(34px, 7vh, 76px);
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.20);
+    border-radius: 22px;
+    background: rgba(2,6,23,.68);
+    backdrop-filter: blur(9px);
+    box-shadow: 0 18px 42px rgba(0,0,0,.46);
+    animation: openingChoiceEnter .48s cubic-bezier(.2,.85,.25,1.18) both;
+}
+
+.opening-display-choices.hidden {
+    display: none;
+}
+
+.opening-display-title {
+    margin-bottom: 10px;
+    color: #fff;
+    text-align: center;
+    font-size: clamp(13px, 1.35vw, 18px);
+    font-weight: 1000;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    text-shadow: 0 2px 6px rgba(0,0,0,.65);
+}
+
+.opening-display-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.opening-display-button {
+    min-height: 76px;
+    border: 2px solid rgba(255,255,255,.52);
+    border-radius: 16px;
+    padding: 10px 14px;
+    color: #fff;
+    font-family: inherit;
+    font-size: clamp(13px, 1.35vw, 18px);
+    font-weight: 1000;
+    letter-spacing: .35px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.36);
+    transition: transform .16s ease, filter .16s ease, border-color .16s ease;
+}
+
+.opening-display-button.fullscreen-choice {
+    background: linear-gradient(145deg, rgba(22,163,74,.97), rgba(21,128,61,.97));
+    box-shadow: 0 10px 26px rgba(0,0,0,.38), 0 0 22px rgba(34,197,94,.22);
+}
+
+.opening-display-button.normal-choice {
+    background: linear-gradient(145deg, rgba(30,64,175,.96), rgba(30,58,138,.96));
+    box-shadow: 0 10px 26px rgba(0,0,0,.38), 0 0 22px rgba(59,130,246,.18);
+}
+
+.opening-display-button:hover {
+    transform: translateY(-2px) scale(1.015);
+    filter: brightness(1.1);
+    border-color: rgba(255,255,255,.86);
+}
+
+.opening-display-button:active {
+    transform: scale(.98);
+}
+
+.opening-display-icon {
+    font-size: clamp(20px, 2vw, 28px);
+    line-height: 1;
+}
+
+.opening-display-button small {
+    margin-top: 2px;
+    color: rgba(255,255,255,.76);
+    font-size: clamp(8px, .85vw, 11px);
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+@keyframes openingChoiceEnter {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* No celular em retrato, empilha os dois modos para facilitar o toque. */
+@media (orientation: portrait) and (max-width: 780px) {
+    .opening-display-choices {
+        width: min(420px, calc(100vw - 22px));
+        margin-bottom: max(28px, env(safe-area-inset-bottom));
+        padding: 10px;
+    }
+
+    .opening-display-buttons {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .opening-display-button {
+        min-height: 62px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    .opening-display-icon {
+        font-size: 20px;
+    }
+}
+
+/* Em landscape baixo, mantém os dois botões lado a lado e compactos. */
+@media (orientation: landscape) and (max-height: 650px) {
+    .opening-display-choices {
+        width: min(610px, calc(100vw - 24px));
+        margin-bottom: max(12px, env(safe-area-inset-bottom));
+        padding: 8px;
+        border-radius: 15px;
+    }
+
+    .opening-display-title {
+        margin-bottom: 6px;
+        font-size: 10px;
+    }
+
+    .opening-display-buttons {
+        gap: 7px;
+    }
+
+    .opening-display-button {
+        min-height: 48px;
+        padding: 5px 9px;
+        border-radius: 11px;
+        font-size: 11px;
+    }
+
+    .opening-display-icon {
+        font-size: 16px;
+    }
+
+    .opening-display-button small {
+        font-size: 7px;
+    }
+
+    /* O botão final de entrada também fica mais acessível em landscape. */
+    .opening-play-button {
+        margin-bottom: max(14px, env(safe-area-inset-bottom)) !important;
+        padding: 10px 20px !important;
+        min-width: 180px !important;
+        font-size: 13px !important;
+    }
+}

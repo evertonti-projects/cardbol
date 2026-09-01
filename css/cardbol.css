@@ -3457,3 +3457,129 @@ button.bench-carousel-item:hover {
         font-size: 13px;
     }
 }
+
+/* =========================================================
+   MOBILE PAISAGEM — PROPORÇÃO CORRETA DO CAMPO
+   Otimização baseada em gravação real no celular.
+========================================================= */
+@media (orientation: landscape) and (max-height: 650px) {
+    html, body { width:100%; height:100%; min-height:100%; overflow:hidden !important; }
+    body { align-items:stretch; }
+
+    .game-container {
+        width:100vw !important; height:100dvh !important; min-height:100dvh !important;
+        max-width:none !important; min-width:0 !important;
+        padding:3px !important; gap:3px !important;
+        display:grid !important;
+        grid-template-rows:60px minmax(0,1fr) 30px !important;
+        overflow:hidden !important;
+    }
+
+    .game-header {
+        width:100% !important; height:60px !important; min-height:0 !important;
+        display:grid !important;
+        grid-template-columns:100px minmax(0,1fr) 190px !important;
+        gap:3px !important; margin:0 !important;
+    }
+
+    .brand-panel { padding:2px 5px !important; min-height:0 !important; }
+    .brand-logo { width:auto !important; max-width:94px !important; max-height:52px !important; }
+
+    .top-panel {
+        min-height:0 !important; gap:3px !important; padding:2px 4px !important;
+        grid-template-columns:minmax(82px,1fr) auto minmax(82px,1fr) !important;
+    }
+
+    .player { padding:4px 3px !important; font-size:8px !important; overflow:hidden; text-overflow:ellipsis; }
+    .electronic-scoreboard { min-width:108px !important; padding:2px 5px 3px !important; }
+    .score-label { font-size:6px !important; }
+    .score-club-logo { width:18px !important; height:18px !important; }
+    .score-number { min-width:22px !important; font-size:18px !important; }
+    .score-separator { font-size:13px !important; }
+    .match-clock-row { gap:4px !important; margin:0 !important; }
+    .match-phase-label { font-size:6px !important; }
+    .match-clock { font-size:9px !important; }
+    .turn { margin-top:0 !important; font-size:6px !important; letter-spacing:.15px !important; }
+    .turn-clock { font-size:7px !important; }
+
+    .dice-area { min-height:0 !important; gap:4px !important; padding:2px 4px !important; }
+    .dice { width:38px !important; height:38px !important; flex-basis:38px !important; padding:4px !important; }
+    .dice .pip { width:6px !important; height:6px !important; }
+    .dice-button { padding:6px 7px !important; font-size:8px !important; }
+    .dice-info { font-size:7px !important; }
+    .dice-value { font-size:16px !important; }
+
+    .match-stage {
+        width:100% !important; height:100% !important;
+        min-width:0 !important; min-height:0 !important; margin:0 !important;
+        display:grid !important;
+        grid-template-columns:100px minmax(0,1fr) 100px !important;
+        gap:3px !important; align-items:center !important;
+        overflow:hidden !important;
+    }
+
+    .pitch-shell,
+    .match-stage .pitch-shell {
+        width:min(100%, calc((100dvh - 99px) * 20 / 11)) !important;
+        height:auto !important;
+        max-width:100% !important;
+        max-height:calc(100dvh - 99px) !important;
+        aspect-ratio:20 / 11 !important;
+        min-width:0 !important; min-height:0 !important;
+        align-self:center !important; justify-self:center !important;
+        border-width:2px !important; border-radius:9px !important;
+        flex:none !important;
+    }
+
+    .team-side {
+        width:100% !important; height:100% !important;
+        max-height:calc(100dvh - 99px) !important;
+        min-height:0 !important; padding:3px !important; gap:3px !important;
+        overflow-y:auto !important; overflow-x:hidden !important;
+    }
+
+    .side-team-title { min-height:16px !important; font-size:6px !important; letter-spacing:.25px !important; }
+    .team-side .squad-box, .team-side .card-hand { padding:2px !important; border-radius:6px !important; }
+    .team-side .squad-title, .team-side .card-hand-title { margin-bottom:2px !important; font-size:5px !important; }
+    .team-side .squad-section { padding:2px !important; }
+    .team-side .squad-label { margin-bottom:1px !important; font-size:5px !important; }
+    .team-side .player-chips, .bench-carousel { min-height:32px !important; height:32px !important; }
+    .bench-carousel-item { width:29px !important; height:29px !important; }
+    .bench-carousel-arrow { width:15px !important; height:20px !important; font-size:9px !important; }
+    .bench-carousel-counter { min-width:17px !important; height:11px !important; line-height:9px !important; font-size:5px !important; }
+    .team-side .card-slots { grid-template-columns:1fr !important; grid-template-rows:repeat(3,minmax(28px,1fr)) !important; gap:2px !important; }
+    .team-side .card-slot { min-height:28px !important; }
+    .team-side .tactical-card .card-number, .team-side .tactical-card .card-name { font-size:6px !important; }
+    .team-side .tactical-card .card-effect { display:none !important; }
+
+    .info-panel {
+        width:100% !important; height:30px !important; min-height:0 !important;
+        padding:2px !important; gap:3px !important;
+        display:grid !important; grid-template-columns:minmax(0,1fr) auto auto auto !important;
+        align-items:center !important;
+    }
+    .message { min-height:24px !important; height:24px !important; padding:3px 6px !important; font-size:7px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fullscreen-button, .formation-confirm-button, .new-game { padding:5px 7px !important; font-size:7px !important; white-space:nowrap; }
+
+    .piece {
+        width:93.6% !important; height:auto !important;
+        max-width:93.6% !important; max-height:93.6% !important;
+        aspect-ratio:1 / 1 !important;
+        left:3.2% !important; top:3.2% !important;
+    }
+    .piece-player-image { aspect-ratio:1 / 1; object-fit:contain !important; }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+    .game-container { grid-template-rows:54px minmax(0,1fr) 27px !important; }
+    .game-header { height:54px !important; grid-template-columns:88px minmax(0,1fr) 176px !important; }
+    .brand-logo { max-width:82px !important; max-height:46px !important; }
+    .match-stage { grid-template-columns:92px minmax(0,1fr) 92px !important; }
+    .pitch-shell, .match-stage .pitch-shell {
+        width:min(100%, calc((100dvh - 90px) * 20 / 11)) !important;
+        max-height:calc(100dvh - 90px) !important;
+    }
+    .team-side { max-height:calc(100dvh - 90px) !important; }
+    .info-panel { height:27px !important; }
+    .message { min-height:21px !important; height:21px !important; font-size:6px !important; }
+}

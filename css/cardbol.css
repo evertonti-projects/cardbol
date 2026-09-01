@@ -3751,3 +3751,105 @@ button.bench-carousel-item:hover {
         font-size: 13px !important;
     }
 }
+
+/* =========================================================
+   SELEÇÃO DE TIMES — MOBILE COMPACTO (~50% MENOR)
+   Corrige corte vertical em celulares, especialmente landscape.
+========================================================= */
+@media (max-width: 900px), (orientation: landscape) and (max-height: 760px) {
+    .team-select-overlay {
+        padding: 5px !important;
+        overflow: hidden !important;
+    }
+
+    .team-select-panel {
+        width: min(760px, 96vw) !important;
+        max-height: 96dvh !important;
+        padding: 8px 9px 7px !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+    }
+
+    .team-select-title {
+        margin: 0 0 2px !important;
+        font-size: 17px !important;
+        line-height: 1 !important;
+        letter-spacing: .035em !important;
+    }
+
+    .team-select-subtitle {
+        margin: 0 0 6px !important;
+        font-size: 7px !important;
+        line-height: 1.18 !important;
+    }
+
+    .team-select-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 5px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        min-height: 56px !important;
+        height: 56px !important;
+        border-radius: 9px !important;
+    }
+
+    .team-card {
+        gap: 2px !important;
+        padding: 2px 4px !important;
+    }
+
+    .team-card-logo {
+        width: 27px !important;
+        height: 27px !important;
+    }
+
+    .team-card-label {
+        font-size: 9px !important;
+        line-height: 1 !important;
+        letter-spacing: .015em !important;
+    }
+
+    .team-card-role {
+        font-size: 6px !important;
+        line-height: 1 !important;
+    }
+
+    .team-card-locked {
+        font-size: 7px !important;
+        letter-spacing: .04em !important;
+    }
+
+    .team-card-locked::before {
+        top: 4px !important;
+        right: 5px !important;
+        font-size: 10px !important;
+    }
+
+    .team-select-footer {
+        margin-top: 5px !important;
+        font-size: 6px !important;
+        line-height: 1.1 !important;
+    }
+}
+
+/* Em retrato muito estreito, mantém 2 colunas, mas com o mesmo
+   tamanho compacto para não transformar o seletor numa tela gigante. */
+@media (max-width: 520px) and (orientation: portrait) {
+    .team-select-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 4px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        min-height: 52px !important;
+        height: 52px !important;
+    }
+
+    .team-card-logo {
+        width: 24px !important;
+        height: 24px !important;
+    }
+}

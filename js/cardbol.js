@@ -498,7 +498,7 @@ function buildTeamSelectCard(teamKey, labelRole) {
             data-team="${teamKey}"
             onclick="selectSideTeam('${teamKey}')"
         >
-            <img class="team-card-logo" src="${club.logo}" alt="Escudo do ${club.shortName}">
+            <img class="team-card-logo" src="imagens/clubes/${club.folder}/logo.png" alt="Escudo do ${club.shortName}">
             <div class="team-card-label">${club.name}</div>
             <div class="team-card-role">${labelRole}</div>
         </button>

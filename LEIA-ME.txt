@@ -1,0 +1,66 @@
+CARDBOL - A PELADA TÁTICA | WEB V2
+
+ESTRUTURA PRINCIPAL
+
+index.html
+css/
+  cardbol.css
+js/
+  cardbol.js
+
+imagens/
+  geral/
+    logo-cardbol.png
+    bola-cardbol-centro-jogo-opacity.png
+    img-champion-blue.png
+    img-champion-red.png
+
+  clubes/
+    barcelona/
+      logo.png
+      go.png
+      atk-1.png
+      atk-2.png
+      ld-1.png
+      ld-2.png
+      le-1.png
+      le-2.png
+      md-1.png
+      md-2.png
+      me-1.png
+      me-2.png
+      zg-1.png
+      zg-2.png
+
+    real-madrid/
+      logo.png
+      go.png
+      atk-1.png
+      atk-2.png
+      ld-1.png
+      ld-2.png
+      le-1.png
+      le-2.png
+      md-1.png
+      md-2.png
+      me-1.png
+      me-2.png
+      zg-1.png
+      zg-2.png
+
+audios/
+videos/
+
+OBSERVAÇÃO
+O JavaScript não possui mais uma lista manual com os nomes de cada PNG.
+Ele monta automaticamente o caminho usando a pasta cadastrada do clube.
+
+Exemplo:
+role = ATK, titular = imagens/clubes/barcelona/atk-1.png
+role = ATK, reserva = imagens/clubes/barcelona/atk-2.png
+role = GO = imagens/clubes/barcelona/go.png
+
+Para um clube futuro, será necessário:
+1. Criar sua pasta em imagens/clubes/.
+2. Colocar os arquivos com esta mesma nomenclatura.
+3. Cadastrar nome e folder no objeto CLUBS em js/cardbol.js.

@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>CardBol - A Pelada Tática</title>
+
+<link rel="stylesheet" href="css/cardbol.css">
+
+</head>
+
+
+<body>
+
+<div id="openingScreen" class="opening-screen" aria-label="Abertura do CardBol">
+    <video
+        id="openingVideo"
+        class="opening-video"
+        src="videos/abertura-pc-1.mp4"
+        muted
+        playsinline
+        preload="auto"
+    ></video>
+
+    <audio
+        id="openingAudio"
+        src="audios/audio-init-jogo.mp3"
+        preload="auto"
+        loop
+    ></audio>
+
+    <button
+        id="openingPlayButton"
+        class="opening-play-button ready"
+        type="button"
+        onclick="handleOpeningButton()"
+    >
+        ▶ INICIAR APRESENTAÇÃO
+    </button>
+</div>
+
+<div id="gameModeOverlay" class="game-mode-overlay" aria-hidden="true">
+    <div class="game-mode-panel">
+        <h2 class="game-mode-title">⚽ COMO VAMOS JOGAR?</h2>
+        <p class="game-mode-subtitle">Escolha o modo desta partida.</p>
+        <div class="game-mode-buttons">
+            <button class="game-mode-button pvp-mode" type="button" onclick="selectGameMode('pvp')">
+                👥 2 JOGADORES
+                <small>Barcelona × Real Madrid no mesmo dispositivo</small>
+            </button>
+            <button class="game-mode-button cpu-mode" type="button" onclick="selectGameMode('cpu')">
+                🤖 CONTRA CPU
+                <small>Você: Barcelona • CPU: Real Madrid</small>
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<div id="teamSelectOverlay" class="team-select-overlay" aria-hidden="true">
+    <div class="team-select-panel">
+        <h2 class="team-select-title">SELECIONAR TIME</h2>
+        <p id="teamSelectSubtitle" class="team-select-subtitle">
+            Escolha o time do lado esquerdo/vermelho. O outro ocupará automaticamente o lado direito/azul.
+        </p>
+
+        <div id="teamSelectGrid" class="team-select-grid"></div>
+
+        <div class="team-select-footer">
+            Por enquanto disponíveis: Barcelona e Real Madrid. Os demais espaços ficam reservados para futuras equipes.
+        </div>
+    </div>
+</div>
+
+<div id="kickoffOverlay" class="kickoff-overlay" aria-hidden="true">
+    <div class="kickoff-panel">
+        <h2 class="kickoff-title">⚽ SORTEIO DO PONTAPÉ INICIAL</h2>
+        <div class="kickoff-subtitle">Formações confirmadas. Vamos descobrir quem começa!</div>
+
+        <div class="kickoff-wheel-wrap">
+            <div class="kickoff-pointer" aria-hidden="true"></div>
+
+            <div id="kickoffWheel" class="kickoff-wheel" aria-label="Roleta com quatro setores azuis e quatro vermelhos">
+                <span class="kickoff-sector-label" style="--sector-angle: 22.5deg;">REAL MADRID</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 67.5deg;">BARCELONA</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 112.5deg;">REAL MADRID</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 157.5deg;">BARCELONA</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 202.5deg;">REAL MADRID</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 247.5deg;">BARCELONA</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 292.5deg;">REAL MADRID</span>
+                <span class="kickoff-sector-label" style="--sector-angle: 337.5deg;">BARCELONA</span>
+            </div>
+        </div>
+
+        <div id="kickoffResult" class="kickoff-result">Quem dará o primeiro toque?</div>
+
+        <button
+            id="kickoffButton"
+            class="kickoff-button"
+            type="button"
+            onclick="spinKickoffRoulette()"
+        >
+            🎯 Definir Pontapé Inicial
+        </button>
+    </div>
+</div>
+
+<!--
+  PADRÃO DE ARQUIVOS VISUAIS DO CARDBOL
+  imagens/geral/logo-cardbol.png   -> logo principal do jogo
+  Imagens gerais ficam em "imagens/geral/" e cada clube possui sua própria pasta em "imagens/clubes/".
+-->
+
+
+<div id="gameRoot" class="game-container">
+
+    <div class="game-header">
+
+        <div class="brand-panel">
+            <img class="brand-logo" alt="CardBol - A Pelada Tática" src="imagens/geral/logo-cardbol.png">
+        </div>
+
+        <div class="top-panel">
+            <div id="redPlayer" class="player red">🔴 BARCELONA</div>
+
+            <div class="electronic-scoreboard" aria-label="Placar da partida">
+                <div class="score-label">PLACAR</div>
+                <div class="score-display">
+                    <span class="score-team score-team-barcelona" title="Barcelona">
+                        <img id="redScoreLogo" class="score-club-logo" src="imagens/clubes/barcelona/logo.png" alt="Escudo do Barcelona">
+                        <span id="redScore" class="score-number red-score">0</span>
+                    </span>
+                    <span class="score-separator">×</span>
+                    <span class="score-team score-team-madrid" title="Real Madrid">
+                        <span id="blueScore" class="score-number blue-score">0</span>
+                        <img id="blueScoreLogo" class="score-club-logo" src="imagens/clubes/real-madrid/logo.png" alt="Escudo do Real Madrid">
+                    </span>
+                </div>
+                <div class="match-clock-row">
+                    <span id="matchPhaseLabel" class="match-phase-label">PRÉ-JOGO</span>
+                    <span id="matchClock" class="match-clock">10:00</span>
+                </div>
+                <div id="turnText" class="turn">VEZ DO REAL MADRID <span id="turnClock" class="turn-clock">⏱ 45s</span></div>
+            </div>
+
+            <div id="bluePlayer" class="player blue active">🔵 REAL MADRID</div>
+        </div>
+
+        <div class="dice-area">
+            <div id="diceTop" class="dice empty" aria-label="dado"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+            <button id="rollTop" class="dice-button" onclick="rollDice()">🎲 JOGAR DADO</button>
+            <div class="dice-info">
+                MOVIMENTO
+                <div id="diceValueTop" class="dice-value">-</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- =====================================================
+         ÁREA PRINCIPAL HORIZONTAL
+         BANCO/CARTAS BARCELONA | GOL | CAMPO | GOL | BANCO/CARTAS REAL MADRID
+    ====================================================== -->
+    <div class="match-stage">
+
+        <!-- LATERAL DO BARCELONA: ATRÁS DO PRÓPRIO GOL -->
+        <aside class="team-side red-side">
+            <div id="redSideTitle" class="side-team-title">🔴 BARCELONA</div>
+
+            <div class="squad-box red-squad side-squad">
+                <div class="squad-title">🎽 BANCO</div>
+                <div class="squad-rows">
+                    <div class="squad-section">
+                        <div class="squad-label">RESERVAS</div>
+                        <div id="redReserves" class="player-chips"></div>
+                    </div>
+                    <div class="squad-section">
+                        <div class="squad-label">🟥 EXPULSOS</div>
+                        <div id="redExpelled" class="player-chips"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="redHand" class="card-hand red-hand side-hand">
+                <div class="card-hand-title">🃏 CARTAS • 3 SLOTS</div>
+                <div id="redCardSlots" class="card-slots"></div>
+            </div>
+
+            <div class="side-card-rule">
+                🎲 <strong>6 = +1 CARTA</strong><br>
+                8 CARTAS • PROB. OFICIAL
+            </div>
+        </aside>
+
+        <!-- CAMPO -->
+        <div class="pitch-shell">
+
+            <div class="goal-line red-goal-line" id="redGoal">
+                <div class="goal-cell" data-col="4">⚽</div>
+                <div class="goal-cell" data-col="5">⚽</div>
+                <div class="goal-cell" data-col="6">⚽</div>
+            </div>
+
+            <div id="board" class="board"></div>
+
+            <div class="goal-line blue-goal-line" id="blueGoal">
+                <div class="goal-cell" data-col="4">⚽</div>
+                <div class="goal-cell" data-col="5">⚽</div>
+                <div class="goal-cell" data-col="6">⚽</div>
+            </div>
+
+        </div>
+
+        <!-- LATERAL DO REAL MADRID: ATRÁS DO PRÓPRIO GOL -->
+        <aside class="team-side blue-side">
+            <div id="blueSideTitle" class="side-team-title">🔵 REAL MADRID</div>
+
+            <div class="squad-box blue-squad side-squad">
+                <div class="squad-title">🎽 BANCO</div>
+                <div class="squad-rows">
+                    <div class="squad-section">
+                        <div class="squad-label">RESERVAS</div>
+                        <div id="blueReserves" class="player-chips"></div>
+                    </div>
+                    <div class="squad-section">
+                        <div class="squad-label">🟥 EXPULSOS</div>
+                        <div id="blueExpelled" class="player-chips"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="blueHand" class="card-hand blue-hand side-hand">
+                <div class="card-hand-title">🃏 CARTAS • 3 SLOTS</div>
+                <div id="blueCardSlots" class="card-slots"></div>
+            </div>
+
+            <div class="side-card-rule">
+                🎲 <strong>6 = +1 CARTA</strong><br>
+                8 CARTAS • PROB. OFICIAL
+            </div>
+        </aside>
+
+    </div>
+
+    <div class="info-panel">
+        <div id="message" class="message">⚙️ Defina a formação inicial.</div>
+        <button id="formationConfirmButton" class="formation-confirm-button red-formation" type="button" onclick="confirmFormation()">✓ CONFIRMAR BARCELONA</button>
+        <button id="fullscreenButton" class="fullscreen-button" type="button" onclick="toggleFullscreen()" aria-pressed="false">⛶ TELA CHEIA</button>
+        <button class="new-game" onclick="newGame()">↻ REINICIAR 0 × 0</button>
+    </div>
+
+    <div class="bottom-panel">
+        <div class="dice-area">
+            <div class="dice-info">DADO<br>ALTERNATIVO</div>
+            <button id="rollBottom" class="dice-button" onclick="rollDice()">🎲 JOGAR DADO</button>
+            <div id="diceBottom" class="dice empty" aria-label="dado alternativo"><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
+        </div>
+
+        <div class="rules">
+            🎲 Jogue o dado antes de escolher a peça. O número sorteado é o limite máximo: você pode mover de 1 casa até o valor do dado, sempre em UMA ÚNICA DIREÇÃO, sem curvas ou dribles. LE, LD, ME e MD usam apenas FRENTE, TRÁS, ESQUERDA e DIREITA; ATK pode usar diagonais em qualquer área; GO e ZG podem usar diagonais somente na própria defesa. ⚔️ Se qualquer jogador já estiver nas 3 últimas linhas do campo de ataque, deve cumprir obrigatoriamente a distância completa do dado ou da carta.<br>
+            🧤 GO: pode ocupar somente as 3 linhas mais próximas do próprio gol e se mover livremente para os lados. • Os demais jogadores começam/recomeçam na 3ª linha.<br>
+            🔴🔵 Cada entrada no gol adversário vale 1 gol. Vence quem chegar primeiro a 5. • ⏱ Partida: 2 tempos de 10min; no intervalo os times podem reorganizar a formação; empate leva a prorrogações de 5min. • ⌛ Cada turno: 45s completos. • 🃏 Tirou 6: recebe 1 carta se houver slot livre. • 🎽 Máximo de 10 jogadores por time. • 🚧 BLOCK impede passagem dos dois times até o próximo gol. • 🚨 GO + 1 restante = derrota.
+        </div>
+    </div>
+
+</div>
+
+<div id="cardVideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame">
+        <video
+            id="cardVideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card2VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card2-video-frame">
+        <video
+            id="card2VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card3VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card3-video-frame">
+        <video
+            id="card3VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card4VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card4-video-frame">
+        <video
+            id="card4VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card7VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card7-video-frame">
+        <video
+            id="card7VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card8VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card8-video-frame">
+        <video
+            id="card8VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card9VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card9-video-frame">
+        <video
+            id="card9VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+<div id="card10VideoOverlay" class="card-video-overlay" aria-hidden="true">
+    <div class="card-video-frame card10-video-frame">
+        <video
+            id="card10VideoPlayer"
+            class="card-video-player"
+            preload="auto"
+            playsinline
+            muted
+        ></video>
+    </div>
+</div>
+
+
+<div id="periodOverlay" class="period-overlay" aria-hidden="true">
+    <div class="period-panel">
+        <h2 id="periodTitle" class="period-title">⏱ FIM DO 1º TEMPO</h2>
+        <div id="periodScore" class="period-score">0 × 0</div>
+        <div id="periodDetail" class="period-detail"></div>
+        <button id="periodButton" class="period-button" type="button" onclick="continueMatchPeriod()">
+            ▶ INICIAR 2º TEMPO
+        </button>
+    </div>
+</div>
+
+<!-- =========================================================
+     VITÓRIA
+========================================================== -->
+
+<div
+    id="victoryOverlay"
+    class="overlay"
+>
+
+
+    <div class="victory">
+
+
+        <img
+            id="championImage"
+            class="champion-image"
+            alt="Imagem do time campeão"
+        >
+
+        <div id="goalIdentity" class="goal-identity" aria-hidden="true">
+            <div class="goal-club-badge">
+                <img id="goalClubLogo" class="goal-club-logo" alt="">
+            </div>
+            <div class="goal-scorer-card">
+                <img id="goalScorerImage" class="goal-scorer-image" alt="">
+            </div>
+        </div>
+
+
+        <h1
+            id="victoryTitle"
+        >
+
+            ⚽ GOOOOOL!
+
+        </h1>
+
+
+        <p
+            id="victoryText"
+        >
+
+            Um jogador marcou!
+
+        </p>
+
+
+        <button
+            id="victoryButton"
+            onclick="handleOverlayButton()"
+        >
+
+            CONTINUAR PARTIDA
+
+        </button>
+
+
+    </div>
+
+
+</div>
+
+
+<script src="js/cardbol.js"></script>
+
+</body>
+
+</html>

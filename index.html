@@ -10,43 +10,6 @@
 
 <title>CardBol - A Pelada Tática</title>
 
-<meta name="description"
-      content="CardBol - A Pelada Tática. Futebol, estratégia, cartas e muita resenha.">
-
-<meta name="theme-color" content="#08111f">
-
-<!-- Ícones / favicon -->
-<link rel="icon"
-      href="imagens/geral/favicon-32x32.ico"
-      sizes="any">
-
-<link rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="imagens/geral/favicon-32x32.png">
-
-<link rel="icon"
-      type="image/png"
-      sizes="48x48"
-      href="imagens/geral/favicon-48x48.png">
-
-<link rel="icon"
-      type="image/png"
-      sizes="64x64"
-      href="imagens/geral/favicon-64x64.png">
-
-<link rel="icon"
-      type="image/png"
-      sizes="128x128"
-      href="imagens/geral/favicon-128x128.png">
-
-<!-- iPhone / iPad -->
-<link rel="apple-touch-icon"
-      href="imagens/geral/apple-touch-icon.png">
-
-<!-- PWA / Android -->
-<link rel="manifest" href="site.webmanifest">
-
 <link rel="stylesheet" href="css/cardbol.css">
 
 </head>
@@ -107,6 +70,86 @@
     >
         ⚽ BATER UMA PELADA
     </button>
+</div>
+
+<div id="rulesOverlay" class="rules-overlay" aria-hidden="true">
+    <div class="rules-panel">
+        <div class="rules-header">
+            <div>
+                <div class="rules-kicker">PASSO OBRIGATÓRIO</div>
+                <h2 class="rules-title">📋 CONHEÇA AS REGRAS</h2>
+            </div>
+            <button id="rulesSkipButton" class="rules-skip-button" type="button" onclick="skipRulesScreens()">PULAR</button>
+        </div>
+
+        <div class="rules-progress">
+            <span class="rules-progress-label">Tela <strong id="rulesPageCurrent">1</strong> de <strong id="rulesPageTotal">5</strong></span>
+            <div class="rules-dots" aria-hidden="true">
+                <span class="rules-dot active"></span>
+                <span class="rules-dot"></span>
+                <span class="rules-dot"></span>
+                <span class="rules-dot"></span>
+                <span class="rules-dot"></span>
+            </div>
+        </div>
+
+        <div class="rules-pages">
+            <section class="rules-page active" data-rules-page="0">
+                <h3>1. Objetivo e tempo da partida</h3>
+                <ul>
+                    <li>Marque gols no adversário movimentando suas peças pelo campo.</li>
+                    <li>Quem fizer <strong>5 gols primeiro</strong> vence na hora.</li>
+                    <li>Se ninguém chegar a 5, a partida vai até <strong>2 tempos de 10 minutos</strong>.</li>
+                    <li>Cada jogada tem <strong>45 segundos por turno</strong>. Se o tempo acabar, a vez passa.</li>
+                </ul>
+            </section>
+
+            <section class="rules-page" data-rules-page="1">
+                <h3>2. Formação inicial</h3>
+                <ul>
+                    <li>Cada time começa com <strong>7 peças</strong>: GO, ZG, LE, LD, ME, MD e ATK.</li>
+                    <li>Antes do jogo, cada lado organiza sua própria formação inicial.</li>
+                    <li>GO fica até a 3ª linha; defesa nas linhas 4–5; meio nas 6–7; ATK nas 8–9.</li>
+                    <li>No intervalo e após gols, o jogo reorganiza a partida respeitando as regras do elenco.</li>
+                </ul>
+            </section>
+
+            <section class="rules-page" data-rules-page="2">
+                <h3>3. Como movimentar</h3>
+                <ul>
+                    <li>Primeiro jogue o dado. O número sorteado é o <strong>máximo</strong> de casas que pode andar.</li>
+                    <li>O movimento deve ser em <strong>uma única direção</strong>, sem curvas e sem atravessar peças ou bloqueios.</li>
+                    <li>LE, LD, ME e MD usam vertical e horizontal. ATK também usa diagonais em todo o campo.</li>
+                    <li>GO e ZG só usam diagonais na defesa. Nas 3 últimas linhas de ataque, a peça deve cumprir a distância completa.</li>
+                </ul>
+            </section>
+
+            <section class="rules-page" data-rules-page="3">
+                <h3>4. Cartas e elenco</h3>
+                <ul>
+                    <li>Tirou <strong>6</strong>? Ganha 1 carta, se houver espaço na mão.</li>
+                    <li>O limite é de <strong>3 cartas na mão</strong> e <strong>10 peças em campo</strong> por time.</li>
+                    <li>As cartas podem expulsar, adicionar reserva, dar passos extras, recuar rival, criar bloqueio e aplicar CATIMBA.</li>
+                    <li>O BLOCK vale para os dois lados e desaparece após o próximo gol.</li>
+                </ul>
+            </section>
+
+            <section class="rules-page" data-rules-page="4">
+                <h3>5. Como vencer</h3>
+                <ul>
+                    <li>Se o tempo acabar, vence quem tiver mais gols.</li>
+                    <li>Empate leva a uma <strong>prorrogação de 5 minutos</strong>.</li>
+                    <li>Se seguir empatado, vence quem tiver <strong>mais peças em campo</strong>.</li>
+                    <li>Se ainda empatar, novas prorrogações de 5 minutos continuam até sair um vencedor. Se um time ficar só com GO + 1 jogador, perde na hora.</li>
+                </ul>
+            </section>
+        </div>
+
+        <div class="rules-actions">
+            <button id="rulesPrevButton" class="rules-nav-button secondary" type="button" onclick="previousRulesPage()">◀ VOLTAR</button>
+            <button id="rulesNextButton" class="rules-nav-button primary" type="button" onclick="nextRulesPage()">PRÓXIMA TELA ▶</button>
+        </div>
+    </div>
 </div>
 
 <div id="gameModeOverlay" class="game-mode-overlay" aria-hidden="true">

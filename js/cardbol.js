@@ -470,6 +470,85 @@ function hideGameModeOverlay() {
     overlay.setAttribute("aria-hidden","true");
 }
 
+const RULES_PAGE_COUNT = 5;
+let currentRulesPage = 0;
+
+function showRulesOverlay() {
+    const overlay = document.getElementById("rulesOverlay");
+    if(!overlay) {
+        showGameModeOverlay();
+        return;
+    }
+
+    currentRulesPage = 0;
+    renderRulesPage();
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function hideRulesOverlay() {
+    const overlay = document.getElementById("rulesOverlay");
+    if(!overlay) return;
+
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+function renderRulesPage() {
+    const pages = [...document.querySelectorAll(".rules-page")];
+    const dots = [...document.querySelectorAll(".rules-dot")];
+    const current = document.getElementById("rulesPageCurrent");
+    const total = document.getElementById("rulesPageTotal");
+    const prevButton = document.getElementById("rulesPrevButton");
+    const nextButton = document.getElementById("rulesNextButton");
+
+    if(total) total.textContent = String(RULES_PAGE_COUNT);
+    if(current) current.textContent = String(currentRulesPage + 1);
+
+    pages.forEach((page, index) => {
+        page.classList.toggle("active", index === currentRulesPage);
+    });
+
+    dots.forEach((dot, index) => {
+        dot.classList.toggle("active", index === currentRulesPage);
+    });
+
+    if(prevButton) {
+        prevButton.disabled = currentRulesPage === 0;
+    }
+
+    if(nextButton) {
+        nextButton.textContent = currentRulesPage >= RULES_PAGE_COUNT - 1
+            ? "✓ IR PARA O JOGO"
+            : "PRÓXIMA TELA ▶";
+    }
+}
+
+function previousRulesPage() {
+    if(currentRulesPage <= 0) return;
+    currentRulesPage -= 1;
+    renderRulesPage();
+}
+
+function nextRulesPage() {
+    if(currentRulesPage >= RULES_PAGE_COUNT - 1) {
+        finishRulesFlow();
+        return;
+    }
+
+    currentRulesPage += 1;
+    renderRulesPage();
+}
+
+function skipRulesScreens() {
+    finishRulesFlow();
+}
+
+function finishRulesFlow() {
+    hideRulesOverlay();
+    showGameModeOverlay();
+}
+
 
 function showTeamSelectOverlay() {
     const overlay = document.getElementById("teamSelectOverlay");
@@ -8715,7 +8794,7 @@ function enterCardBolGame() {
     fadeOutOpeningAudio(1000, () => {
         screen.style.display = "none";
         applyTeamBranding();
-        showGameModeOverlay();
+        showRulesOverlay();
     });
 }
 

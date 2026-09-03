@@ -519,6 +519,83 @@ function hideGameModeOverlay() {
     overlay.setAttribute("aria-hidden","true");
 }
 
+// ============================================================
+// IDENTIFICAÇÃO DO JOGADOR
+// Etapa local por enquanto. O PIN fica somente na memória desta
+// sessão e será conectado ao ranking/Supabase em uma etapa futura.
+// ============================================================
+let currentUserIdentity = {
+    username: "",
+    pin: ""
+};
+
+function showPlayerIdentityOverlay() {
+    const overlay = document.getElementById("playerIdentityOverlay");
+    const usernameInput = document.getElementById("playerUsernameInput");
+    const pinInput = document.getElementById("playerPinInput");
+    const error = document.getElementById("playerIdentityError");
+
+    if(!overlay) {
+        showRulesOverlay();
+        return;
+    }
+
+    if(error) error.textContent = "";
+    if(pinInput) pinInput.value = "";
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+
+    window.setTimeout(() => {
+        if(usernameInput) usernameInput.focus();
+    }, 60);
+}
+
+function hidePlayerIdentityOverlay() {
+    const overlay = document.getElementById("playerIdentityOverlay");
+    if(!overlay) return;
+
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+function normalizePinInput(input) {
+    if(!input) return;
+    input.value = input.value.replace(/\D/g, "").slice(0, 4);
+}
+
+function submitPlayerIdentity(event) {
+    if(event) event.preventDefault();
+
+    const usernameInput = document.getElementById("playerUsernameInput");
+    const pinInput = document.getElementById("playerPinInput");
+    const error = document.getElementById("playerIdentityError");
+
+    const username = usernameInput ? usernameInput.value.trim() : "";
+    const pin = pinInput ? pinInput.value.replace(/\D/g, "") : "";
+
+    if(!username) {
+        if(error) error.textContent = "Digite um nome de usuário para continuar.";
+        if(usernameInput) usernameInput.focus();
+        return;
+    }
+
+    if(!/^\d{4}$/.test(pin)) {
+        if(error) error.textContent = "O PIN precisa ter exatamente 4 números.";
+        if(pinInput) {
+            pinInput.value = pin.slice(0, 4);
+            pinInput.focus();
+        }
+        return;
+    }
+
+    currentUserIdentity = { username, pin };
+    if(error) error.textContent = "";
+
+    hidePlayerIdentityOverlay();
+    showRulesOverlay();
+}
+
 const RULES_PAGE_COUNT = 5;
 let currentRulesPage = 0;
 
@@ -8884,8 +8961,14 @@ function enterCardBolGame() {
     fadeOutOpeningAudio(1000, () => {
         screen.style.display = "none";
         applyTeamBranding();
-        showRulesOverlay();
+        showPlayerIdentityOverlay();
     });
+}
+
+// Mantém o campo PIN estritamente numérico também em colagens.
+const playerPinInput = document.getElementById("playerPinInput");
+if(playerPinInput) {
+    playerPinInput.addEventListener("input", () => normalizePinInput(playerPinInput));
 }
 
 // ============================================================

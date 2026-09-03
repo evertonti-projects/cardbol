@@ -86,7 +86,7 @@
     <form id="playerIdentityForm" class="player-identity-panel" onsubmit="submitPlayerIdentity(event)" novalidate>
         <div class="player-identity-kicker">IDENTIFICAÇÃO DO JOGADOR</div>
         <h2 class="player-identity-title">👤 ENTRE NO CARDBOL</h2>
-        <p class="player-identity-subtitle">Informe seus dados para continuar.</p>
+        <p class="player-identity-subtitle">Informe seus dados para entrar. Se o nome ainda não existir, o cadastro será criado automaticamente.</p>
 
         <label class="player-identity-field" for="playerUsernameInput">
             <span>NOME DE USUÁRIO</span>
@@ -94,7 +94,8 @@
                 id="playerUsernameInput"
                 name="username"
                 type="text"
-                maxlength="24"
+                minlength="3"
+                maxlength="20"
                 autocomplete="username"
                 autocapitalize="none"
                 spellcheck="false"
@@ -124,7 +125,7 @@
         <div id="playerIdentityError" class="player-identity-error" role="alert" aria-live="polite"></div>
 
         <button id="playerIdentitySubmit" class="player-identity-submit" type="submit">
-            ⚽ CONTINUAR
+            ⚽ ENTRAR NO CARDBOL
         </button>
     </form>
 </div>

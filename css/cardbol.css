@@ -4588,3 +4588,12 @@ button.bench-carousel-item:hover {
         font-size: 10px;
     }
 }
+
+
+/* LOGIN SUPABASE — estado de conexão */
+.player-identity-submit:disabled {
+    opacity: .64;
+    cursor: wait;
+    transform: none !important;
+    filter: none !important;
+}

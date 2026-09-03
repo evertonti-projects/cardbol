@@ -520,28 +520,40 @@ function hideGameModeOverlay() {
 }
 
 // ============================================================
-// IDENTIFICAÇÃO DO JOGADOR
-// Etapa local por enquanto. O PIN fica somente na memória desta
-// sessão e será conectado ao ranking/Supabase em uma etapa futura.
+// IDENTIFICAÇÃO DO JOGADOR — SUPABASE
+// O navegador envia nome + PIN apenas para a função segura RPC.
+// O PIN nunca é mantido no estado do jogo após a autenticação.
 // ============================================================
+const SUPABASE_URL = "https://rgknhgiufrfkjftugvfp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HIZ6Vcyuk4ySpak8Y9jEMQ_T7SV5M21";
+
 let currentUserIdentity = {
+    playerId: null,
     username: "",
-    pin: ""
+    loginStatus: ""
 };
+
+let playerIdentitySubmitting = false;
 
 function showPlayerIdentityOverlay() {
     const overlay = document.getElementById("playerIdentityOverlay");
     const usernameInput = document.getElementById("playerUsernameInput");
     const pinInput = document.getElementById("playerPinInput");
     const error = document.getElementById("playerIdentityError");
+    const submitButton = document.getElementById("playerIdentitySubmit");
 
     if(!overlay) {
         showRulesOverlay();
         return;
     }
 
+    playerIdentitySubmitting = false;
     if(error) error.textContent = "";
     if(pinInput) pinInput.value = "";
+    if(submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "⚽ ENTRAR NO CARDBOL";
+    }
 
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden", "false");
@@ -564,18 +576,50 @@ function normalizePinInput(input) {
     input.value = input.value.replace(/\D/g, "").slice(0, 4);
 }
 
-function submitPlayerIdentity(event) {
+async function requestCardBolLogin(username, pin) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_PUBLISHABLE_KEY,
+            "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify({
+            p_username: username,
+            p_pin: pin
+        })
+    });
+
+    if(!response.ok) {
+        let detail = "";
+        try {
+            const errorPayload = await response.json();
+            detail = errorPayload?.message || errorPayload?.details || "";
+        } catch(error) {
+            // Mantém mensagem genérica abaixo.
+        }
+        throw new Error(detail || `Falha de conexão (${response.status})`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload) ? payload[0] : payload;
+}
+
+async function submitPlayerIdentity(event) {
     if(event) event.preventDefault();
+    if(playerIdentitySubmitting) return;
 
     const usernameInput = document.getElementById("playerUsernameInput");
     const pinInput = document.getElementById("playerPinInput");
     const error = document.getElementById("playerIdentityError");
+    const submitButton = document.getElementById("playerIdentitySubmit");
 
     const username = usernameInput ? usernameInput.value.trim() : "";
     const pin = pinInput ? pinInput.value.replace(/\D/g, "") : "";
 
-    if(!username) {
-        if(error) error.textContent = "Digite um nome de usuário para continuar.";
+    if(username.length < 3 || username.length > 20) {
+        if(error) error.textContent = "O nome de usuário precisa ter entre 3 e 20 caracteres.";
         if(usernameInput) usernameInput.focus();
         return;
     }
@@ -589,11 +633,63 @@ function submitPlayerIdentity(event) {
         return;
     }
 
-    currentUserIdentity = { username, pin };
-    if(error) error.textContent = "";
+    playerIdentitySubmitting = true;
+    if(error) error.textContent = "Conectando ao ranking...";
+    if(submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "⏳ CONECTANDO...";
+    }
 
-    hidePlayerIdentityOverlay();
-    showRulesOverlay();
+    try {
+        const result = await requestCardBolLogin(username, pin);
+
+        if(!result || result.success !== true) {
+            const status = result?.status || "UNKNOWN";
+            const messages = {
+                INVALID_USERNAME: "Nome de usuário inválido. Use entre 3 e 20 caracteres.",
+                INVALID_PIN: "O PIN precisa ter exatamente 4 números.",
+                WRONG_PIN: "PIN incorreto para este nome de usuário.",
+                LOCKED: "Muitas tentativas incorretas. Este usuário está temporariamente bloqueado."
+            };
+
+            if(error) error.textContent = messages[status] || "Não foi possível entrar. Tente novamente.";
+            if(pinInput) {
+                pinInput.value = "";
+                pinInput.focus();
+            }
+            return;
+        }
+
+        currentUserIdentity = {
+            playerId: result.player_id || null,
+            username: result.username || username,
+            loginStatus: result.status || "LOGIN"
+        };
+
+        // O PIN deixa de existir no formulário assim que o servidor confirma.
+        if(pinInput) pinInput.value = "";
+
+        if(error) {
+            error.textContent = result.status === "CREATED"
+                ? `✓ Bem-vindo, ${currentUserIdentity.username}! Cadastro criado.`
+                : `✓ Bem-vindo de volta, ${currentUserIdentity.username}!`;
+        }
+
+        window.setTimeout(() => {
+            hidePlayerIdentityOverlay();
+            showRulesOverlay();
+        }, 450);
+
+    } catch(connectionError) {
+        console.error("CardBol login:", connectionError);
+        if(error) error.textContent = "Não foi possível conectar ao ranking. Verifique sua internet e tente novamente.";
+    } finally {
+        playerIdentitySubmitting = false;
+        if(submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "⚽ ENTRAR NO CARDBOL";
+        }
+    }
 }
 
 const RULES_PAGE_COUNT = 5;

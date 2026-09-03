@@ -43,13 +43,43 @@ const CLUBS = {
         shortName: "Chelsea",
         folder: "chelsea",
         cardClass: "chelsea-card"
+    },
+    "bayern-munique": {
+        key: "bayern-munique",
+        name: "BAYERN DE MUNIQUE",
+        shortName: "Bayern de Munique",
+        folder: "bayern-munique",
+        cardClass: "bayern-card"
+    },
+    "borussia-dortmund": {
+        key: "borussia-dortmund",
+        name: "BORUSSIA DORTMUND",
+        shortName: "Borussia Dortmund",
+        folder: "borussia-dortmund",
+        cardClass: "dortmund-card"
+    },
+    vasco: {
+        key: "vasco",
+        name: "VASCO",
+        shortName: "Vasco",
+        folder: "vasco",
+        cardClass: "vasco-card"
     }
 };
 
-const AVAILABLE_TEAM_KEYS = ["barcelona", "real-madrid", "arsenal", "chelsea"];
+const AVAILABLE_TEAM_KEYS = [
+    "barcelona",
+    "real-madrid",
+    "arsenal",
+    "chelsea",
+    "bayern-munique",
+    "borussia-dortmund",
+    "vasco"
+];
 
-// A escolha do seletor define o clube do lado vermelho.
-// O lado azul recebe automaticamente o outro.
+// O seletor agora possui duas etapas:
+// 1º clube = lado vermelho/jogador humano.
+// 2º clube = lado azul/adversário ou CPU.
 let teamAssignments = {
     1: "barcelona",
     0: "real-madrid"

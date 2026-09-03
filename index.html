@@ -10,6 +10,16 @@
 
 <title>CardBol - A Pelada Tática</title>
 
+<meta name="description" content="CardBol - A Pelada Tática. Futebol, estratégia, cartas e muita resenha.">
+<meta name="theme-color" content="#08111f">
+<link rel="icon" href="imagens/geral/favicon-32x32.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="imagens/geral/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="imagens/geral/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="64x64" href="imagens/geral/favicon-64x64.png">
+<link rel="icon" type="image/png" sizes="128x128" href="imagens/geral/favicon-128x128.png">
+<link rel="apple-touch-icon" href="imagens/geral/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
 <link rel="stylesheet" href="css/cardbol.css">
 
 </head>
@@ -180,11 +190,11 @@
         <div class="game-mode-buttons">
             <button class="game-mode-button pvp-mode" type="button" onclick="selectGameMode('pvp')">
                 👥 2 JOGADORES
-                <small>Barcelona × Real Madrid no mesmo dispositivo</small>
+                <small>Escolha os dois clubes desta partida</small>
             </button>
             <button class="game-mode-button cpu-mode" type="button" onclick="selectGameMode('cpu')">
                 🤖 CONTRA CPU
-                <small>Você: Barcelona • CPU: Real Madrid</small>
+                <small>Escolha seu clube e o time da CPU</small>
             </button>
         </div>
     </div>
@@ -195,13 +205,13 @@
     <div class="team-select-panel">
         <h2 class="team-select-title">SELECIONAR TIME</h2>
         <p id="teamSelectSubtitle" class="team-select-subtitle">
-            Escolha o time do lado esquerdo/vermelho. O outro ocupará automaticamente o lado direito/azul.
+            Escolha os dois clubes da partida, um lado de cada vez.
         </p>
 
         <div id="teamSelectGrid" class="team-select-grid"></div>
 
         <div class="team-select-footer">
-            Por enquanto disponíveis: Barcelona e Real Madrid. Os demais espaços ficam reservados para futuras equipes.
+            Disponíveis agora: Barcelona, Real Madrid, Arsenal e Chelsea. Os demais espaços ficam reservados para futuras equipes.
         </div>
     </div>
 </div>

@@ -4330,3 +4330,29 @@ button.bench-carousel-item:hover {
         font-size: 5px !important;
     }
 }
+
+
+/* =========================================================
+   NOVOS CLUBES — ARSENAL / CHELSEA
+========================================================= */
+.team-card.arsenal-card {
+    background:
+        linear-gradient(145deg, rgba(185,28,28,.92), rgba(127,29,29,.72)),
+        linear-gradient(180deg, #dc2626, #450a0a);
+}
+
+.team-card.chelsea-card {
+    background:
+        linear-gradient(145deg, rgba(29,78,216,.92), rgba(30,58,138,.72)),
+        linear-gradient(180deg, #2563eb, #172554);
+}
+
+.team-card.team-card-disabled,
+.team-card.team-card-disabled:hover {
+    cursor: not-allowed;
+    opacity: .38;
+    filter: grayscale(.35);
+    transform: none;
+    border-color: rgba(255,255,255,.10);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}

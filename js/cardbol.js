@@ -20,17 +20,33 @@ const CLUBS = {
         key: "barcelona",
         name: "BARCELONA",
         shortName: "Barcelona",
-        folder: "barcelona"
+        folder: "barcelona",
+        cardClass: "barcelona-card"
     },
     "real-madrid": {
         key: "real-madrid",
         name: "REAL MADRID",
         shortName: "Real Madrid",
-        folder: "real-madrid"
+        folder: "real-madrid",
+        cardClass: "real-card"
+    },
+    arsenal: {
+        key: "arsenal",
+        name: "ARSENAL",
+        shortName: "Arsenal",
+        folder: "arsenal",
+        cardClass: "arsenal-card"
+    },
+    chelsea: {
+        key: "chelsea",
+        name: "CHELSEA",
+        shortName: "Chelsea",
+        folder: "chelsea",
+        cardClass: "chelsea-card"
     }
 };
 
-const AVAILABLE_TEAM_KEYS = ["barcelona", "real-madrid"];
+const AVAILABLE_TEAM_KEYS = ["barcelona", "real-madrid", "arsenal", "chelsea"];
 
 // A escolha do seletor define o clube do lado vermelho.
 // O lado azul recebe automaticamente o outro.
@@ -38,6 +54,9 @@ let teamAssignments = {
     1: "barcelona",
     0: "real-madrid"
 };
+
+// Etapa 1: escolhe o lado vermelho. Etapa 0: escolhe o lado azul.
+let teamSelectionPlayer = 1;
 
 const MAX_CARDS = 3;
 const MAX_TEAM_PIECES = 10;
@@ -554,6 +573,7 @@ function showTeamSelectOverlay() {
     const overlay = document.getElementById("teamSelectOverlay");
     if(!overlay) return;
 
+    teamSelectionPlayer = 1;
     populateTeamSelectGrid();
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden","false");
@@ -566,20 +586,23 @@ function hideTeamSelectOverlay() {
     overlay.setAttribute("aria-hidden","true");
 }
 
-function buildTeamSelectCard(teamKey, labelRole) {
+function buildTeamSelectCard(teamKey, labelRole, disabled = false) {
     const club = CLUBS[teamKey];
-    const cssClass = teamKey === "barcelona" ? "barcelona-card" : "real-card";
+    const cssClass = club.cardClass || "";
+    const disabledClass = disabled ? " team-card-disabled" : "";
+    const disabledAttr = disabled ? " disabled aria-disabled=\"true\"" : "";
 
     return `
         <button
             type="button"
-            class="team-card ${cssClass}"
+            class="team-card ${cssClass}${disabledClass}"
             data-team="${teamKey}"
             onclick="selectSideTeam('${teamKey}')"
+            ${disabledAttr}
         >
             <img class="team-card-logo" src="imagens/clubes/${club.folder}/logo.png" alt="Escudo do ${club.shortName}">
             <div class="team-card-label">${club.name}</div>
-            <div class="team-card-role">${labelRole}</div>
+            <div class="team-card-role">${disabled ? "JÁ SELECIONADO" : labelRole}</div>
         </button>
     `;
 }
@@ -589,30 +612,41 @@ function populateTeamSelectGrid() {
     const subtitle = document.getElementById("teamSelectSubtitle");
     if(!grid) return;
 
-    const roleText = isCpuMode()
-        ? "Você jogará deste lado"
-        : "Ficará no lado vermelho";
+    const choosingRed = teamSelectionPlayer === 1;
+    const roleText = choosingRed
+        ? (isCpuMode() ? "SEU TIME" : "TIME VERMELHO")
+        : (isCpuMode() ? "TIME DA CPU" : "TIME AZUL");
 
     let html = "";
-    html += buildTeamSelectCard("barcelona", roleText);
-    html += buildTeamSelectCard("real-madrid", roleText);
 
-    for(let i = 0; i < 10; i++) {
+    AVAILABLE_TEAM_KEYS.forEach(teamKey => {
+        const disabled = !choosingRed && teamKey === teamAssignments[1];
+        html += buildTeamSelectCard(teamKey, roleText, disabled);
+    });
+
+    const lockedSlots = Math.max(0, 12 - AVAILABLE_TEAM_KEYS.length);
+    for(let i = 0; i < lockedSlots; i++) {
         html += `<div class="team-card-locked">EM BREVE</div>`;
     }
 
     grid.innerHTML = html;
 
     grid.querySelectorAll(".team-card").forEach(card => {
-        if(card.dataset.team === teamAssignments[1]) {
+        if(card.dataset.team === teamAssignments[teamSelectionPlayer]) {
             card.classList.add("active-team-card");
         }
     });
 
     if(subtitle) {
-        subtitle.textContent = isCpuMode()
-            ? "Escolha seu time. A CPU ficará automaticamente com o outro clube. O lado vermelho sempre começa definindo a própria formação."
-            : "Escolha o time do lado vermelho. O outro clube ocupará automaticamente o lado azul.";
+        if(choosingRed) {
+            subtitle.textContent = isCpuMode()
+                ? "1 de 2 — Escolha o seu clube. Depois você escolherá o time da CPU."
+                : "1 de 2 — Escolha o clube do lado vermelho. Depois escolha o lado azul.";
+        } else {
+            subtitle.textContent = isCpuMode()
+                ? `2 de 2 — Você escolheu ${teamShortName(1)}. Agora escolha o time da CPU.`
+                : `2 de 2 — ${teamShortName(1)} ficou no lado vermelho. Agora escolha o clube do lado azul.`;
+        }
     }
 }
 
@@ -647,11 +681,13 @@ function applyTeamBranding() {
     if(redScoreLogo) {
         redScoreLogo.src = getTeamLogo(1);
         redScoreLogo.alt = `Escudo do ${teamShortName(1)}`;
+        redScoreLogo.closest(".score-team")?.setAttribute("title", teamShortName(1));
     }
 
     if(blueScoreLogo) {
         blueScoreLogo.src = getTeamLogo(0);
         blueScoreLogo.alt = `Escudo do ${teamShortName(0)}`;
+        blueScoreLogo.closest(".score-team")?.setAttribute("title", teamShortName(0));
     }
 
     const wheelLabels = document.querySelectorAll("#kickoffWheel .kickoff-sector-label");
@@ -661,26 +697,50 @@ function applyTeamBranding() {
 
     const modeButtons = document.querySelectorAll(".game-mode-button small");
     if(modeButtons[0]) {
-        modeButtons[0].textContent = `${teamShortName(1)} × ${teamShortName(0)} no mesmo dispositivo`;
+        modeButtons[0].textContent = "Escolha os dois clubes desta partida";
     }
     if(modeButtons[1]) {
-        modeButtons[1].textContent = `Você: ${teamShortName(1)} • CPU: ${teamShortName(0)}`;
+        modeButtons[1].textContent = "Escolha seu clube e o time da CPU";
     }
 }
 
 function selectSideTeam(teamKey) {
     if(!AVAILABLE_TEAM_KEYS.includes(teamKey)) return;
 
-    teamAssignments[1] = teamKey;
-    teamAssignments[0] = AVAILABLE_TEAM_KEYS.find(key => key !== teamKey) || "real-madrid";
+    // 1ª etapa: lado vermelho / jogador humano.
+    if(teamSelectionPlayer === 1) {
+        teamAssignments[1] = teamKey;
+
+        // Mantém um adversário provisório diferente até a escolha definitiva.
+        if(teamAssignments[0] === teamKey) {
+            teamAssignments[0] = AVAILABLE_TEAM_KEYS.find(key => key !== teamKey) || "real-madrid";
+        }
+
+        teamSelectionPlayer = 0;
+        populateTeamSelectGrid();
+        applyTeamBranding();
+
+        setMessage(
+            isCpuMode()
+                ? `✅ ${playerName(1)} escolhido. Agora selecione o clube da CPU.`
+                : `✅ ${playerName(1)} ficou no lado vermelho. Agora selecione o lado azul.`,
+            0
+        );
+        return;
+    }
+
+    // 2ª etapa: não permite o mesmo clube nos dois lados.
+    if(teamKey === teamAssignments[1]) return;
+
+    teamAssignments[0] = teamKey;
 
     hideTeamSelectOverlay();
     applyTeamBranding();
 
     setMessage(
         isCpuMode()
-            ? `🤖 MODO VS CPU! Você joga com ${playerName(1)} no lado vermelho. A CPU ficará com ${playerName(0)} no lado azul.`
-            : `👥 MODO 2 JOGADORES! ${playerName(1)} começa definindo a formação no lado vermelho.`,
+            ? `🤖 MODO VS CPU! Você joga com ${playerName(1)} no lado vermelho. A CPU joga com ${playerName(0)} no lado azul.`
+            : `👥 MODO 2 JOGADORES! ${playerName(1)} enfrenta ${playerName(0)}. ${playerName(1)} começa definindo a formação.`,
         0
     );
 
@@ -2416,13 +2476,13 @@ function selectFormationPiece(piece) {
 function handleFormationCellClick(row, col) {
     if(!formationSetupActive) return false;
     if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
-        setMessage("🤖 Aguarde a CPU REAL MADRID concluir a formação.",0);
+        setMessage(`🤖 Aguarde a CPU ${playerName(CPU_PLAYER)} concluir a formação.`,0);
         return true;
     }
 
     if(!formationSelectedPiece) {
         setMessage(
-            `${formationSetupPlayer === 1 ? "🔴 Barcelona" : "🔵 Real Madrid"}: clique primeiro em uma peça para definir sua posição inicial.`,
+            `${formationSetupPlayer === 1 ? "🔴" : "🔵"} ${playerName(formationSetupPlayer)}: clique primeiro em uma peça para definir sua posição inicial.`,
             0
         );
         return true;
@@ -6793,7 +6853,7 @@ function rollDice() {
 
     if(formationSetupActive) {
         setMessage(
-            `${formationSetupPlayer === 1 ? "🔴 Barcelona" : "🔵 Real Madrid"}: confirme a formação antes de jogar o dado.`,
+            `${formationSetupPlayer === 1 ? "🔴" : "🔵"} ${playerName(formationSetupPlayer)}: confirme a formação antes de jogar o dado.`,
             0
         );
         return;
@@ -7468,9 +7528,9 @@ function passTurn(reason = "normal") {
             `⏱ Tempo do ${playerName(outgoingPlayer)} esgotado! ${playerName(currentPlayer)} assume a vez.`
         );
     } else if(currentPlayer === 0) {
-        setMessage("🔵 Real Madrid: jogue o dado.");
+        setMessage(`🔵 ${playerName(0)}: jogue o dado.`);
     } else {
-        setMessage("🔴 Barcelona: jogue o dado.");
+        setMessage(`🔴 ${playerName(1)}: jogue o dado.`);
     }
 
     render();
@@ -7906,13 +7966,13 @@ function getRotatingInfoMessages() {
         `🚧 BLOQUEIO — Coloque um BLOCK na sua metade defensiva, exceto nas 3 casas à frente do gol; ninguém atravessa até o próximo gol.`,
         `↩️ RECUO TÁTICO — Force 1 adversário a recuar até 5 casas rumo à própria defesa.`,
         `🐢 CATIMBA! — Próximo turno do rival: 1→0 • 2/3→1 • 4/5→2 • 6→3 e sem bônus no 6.`,
-        catimbaPending[0] ? `🐢 Real Madrid sofrerá CATIMBA no próximo dado.` : null,
-        catimbaPending[1] ? `🐢 Barcelona sofrerá CATIMBA no próximo dado.` : null,
+        catimbaPending[0] ? `🐢 ${playerName(0)} sofrerá CATIMBA no próximo dado.` : null,
+        catimbaPending[1] ? `🐢 ${playerName(1)} sofrerá CATIMBA no próximo dado.` : null,
         `🚧 BLOCKS ativos no campo: ${blocks.length}.`,
         `⚽ Cada entrada no gol vale 1. Primeiro a 5 vence a partida.`,
         `🧤 GO só pode ficar nas 3 linhas defensivas do próprio lado.`,
         `📊 Placar atual: ${getScoreLineText()}.`,
-        `🃏 Cartas na mão: Barcelona ${hands[1].length}/3 • Real Madrid ${hands[0].length}/3.`,
+        `🃏 Cartas na mão: ${playerName(1)} ${hands[1].length}/3 • ${playerName(0)} ${hands[0].length}/3.`,
         `🚨 Se um time ficar apenas com GO + 1 jogador, o adversário vence a partida.`
     ].filter(Boolean);
 

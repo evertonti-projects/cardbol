@@ -530,7 +530,8 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HIZ6Vcyuk4ySpak8Y9jEMQ_T7SV5M21
 let currentUserIdentity = {
     playerId: null,
     username: "",
-    loginStatus: ""
+    loginStatus: "",
+    sessionToken: ""
 };
 
 let playerIdentitySubmitting = false;
@@ -611,6 +612,161 @@ async function requestCardBolLogin(username, pin) {
     return Array.isArray(payload) ? payload[0] : payload;
 }
 
+
+function createCardBolMatchKey() {
+    if(window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+    }
+
+    // Fallback UUID v4 para navegadores antigos.
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
+        const random = Math.floor(Math.random() * 16);
+        const value = char === "x" ? random : ((random & 0x3) | 0x8);
+        return value.toString(16);
+    });
+}
+
+let currentMatchKey = createCardBolMatchKey();
+let matchRankingSubmissionStarted = false;
+
+function setRankingSaveStatus(message = "", state = "") {
+    const element = document.getElementById("rankingSaveStatus");
+    if(!element) return;
+
+    element.textContent = message;
+    element.classList.remove("pending", "success", "error");
+
+    if(state) {
+        element.classList.add(state);
+    }
+
+    element.style.display = message ? "block" : "none";
+}
+
+function getRankingOpponentName() {
+    return isCpuMode() ? "CPU" : "JOGADOR 2";
+}
+
+async function requestCardBolRecordMatch(payload) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_record_match`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_PUBLISHABLE_KEY
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if(!response.ok) {
+        let detail = "";
+
+        try {
+            const errorPayload = await response.json();
+            const parts = [
+                errorPayload?.message,
+                errorPayload?.details,
+                errorPayload?.hint,
+                errorPayload?.code ? `código ${errorPayload.code}` : ""
+            ].filter(Boolean);
+
+            detail = parts.join(" • ");
+        } catch(error) {
+            // Usa o status HTTP abaixo.
+        }
+
+        throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data[0] : data;
+}
+
+async function registerOfficialMatchToRanking(winningPlayer) {
+    if(matchRankingSubmissionStarted) return;
+
+    // O usuário autenticado controla sempre o lado vermelho / player 1.
+    if(
+        !currentUserIdentity.playerId ||
+        !currentUserIdentity.sessionToken
+    ) {
+        setRankingSaveStatus(
+            "⚠ Resultado não registrado: sessão do ranking indisponível.",
+            "error"
+        );
+        return;
+    }
+
+    matchRankingSubmissionStarted = true;
+
+    const submittedMatchKey = currentMatchKey;
+    const userWon = winningPlayer === 1;
+    const pointsDelta = userWon ? 3 : -1;
+
+    setRankingSaveStatus("⏳ Registrando resultado no ranking...", "pending");
+
+    try {
+        const result = await requestCardBolRecordMatch({
+            p_match_key: submittedMatchKey,
+            p_player_id: currentUserIdentity.playerId,
+            p_session_token: currentUserIdentity.sessionToken,
+
+            p_mode: gameMode || "pvp",
+
+            p_player_club: getTeamKeyForPlayer(1),
+            p_opponent_club: getTeamKeyForPlayer(0),
+            p_opponent_name: getRankingOpponentName(),
+
+            p_player_goals: scoreRed,
+            p_opponent_goals: scoreBlue,
+
+            p_result: userWon ? "win" : "loss",
+            p_victory_type: matchEndReason || "unknown"
+        });
+
+        if(!result || result.success !== true) {
+            const status = result?.status || "UNKNOWN";
+
+            if(status === "INVALID_SESSION") {
+                throw new Error("Sessão expirada. Faça login novamente.");
+            }
+
+            throw new Error(`Falha ao registrar partida (${status}).`);
+        }
+
+        if(currentMatchKey !== submittedMatchKey) return;
+
+        if(result.status === "DUPLICATE") {
+            setRankingSaveStatus(
+                "✓ Esta partida já estava registrada no ranking.",
+                "success"
+            );
+            return;
+        }
+
+        const pointsLabel = pointsDelta > 0 ? `+${pointsDelta}` : `${pointsDelta}`;
+
+        setRankingSaveStatus(
+            `✓ Resultado registrado no ranking • ${pointsLabel} pt${Math.abs(pointsDelta) === 1 ? "" : "s"}`,
+            "success"
+        );
+
+    } catch(error) {
+        console.error("CardBol ranking:", error);
+
+        if(currentMatchKey !== submittedMatchKey) return;
+
+        const detail = String(error?.message || "").trim();
+
+        setRankingSaveStatus(
+            detail
+                ? `⚠ Ranking: ${detail}`
+                : "⚠ Não foi possível registrar o resultado.",
+            "error"
+        );
+    }
+}
+
 async function submitPlayerIdentity(event) {
     if(event) event.preventDefault();
     if(playerIdentitySubmitting) return;
@@ -668,7 +824,8 @@ async function submitPlayerIdentity(event) {
         currentUserIdentity = {
             playerId: result.player_id || null,
             username: result.username || username,
-            loginStatus: result.status || "LOGIN"
+            loginStatus: result.status || "LOGIN",
+            sessionToken: result.session_token || ""
         };
 
         // O PIN deixa de existir no formulário assim que o servidor confirma.
@@ -8358,6 +8515,12 @@ function playFinalVictoryAudio() {
 
 function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
 
+    if(matchEnded) {
+        registerOfficialMatchToRanking(scoringPlayer);
+    } else {
+        setRankingSaveStatus("", "");
+    }
+
     const overlay = document.getElementById("victoryOverlay");
     const title = document.getElementById("victoryTitle");
     const text = document.getElementById("victoryText");
@@ -8561,6 +8724,12 @@ document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 // ============================================================
 
 function newGame() {
+
+    // Cada partida oficial recebe uma chave única.
+    // Isso impede duplicidade no Supabase.
+    currentMatchKey = createCardBolMatchKey();
+    matchRankingSubmissionStarted = false;
+    setRankingSaveStatus("", "");
 
     lastCardsRenderSignature = "";
     benchCarouselRenderSignatures = {};

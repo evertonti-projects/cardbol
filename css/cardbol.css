@@ -4597,3 +4597,47 @@ button.bench-carousel-item:hover {
     transform: none !important;
     filter: none !important;
 }
+
+
+/* =========================================================
+   STATUS DE REGISTRO NO RANKING
+========================================================= */
+.ranking-save-status {
+    display: none;
+    width: min(92%, 520px);
+    margin: 8px auto 2px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.25;
+    font-weight: 900;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(15,23,42,.72);
+}
+
+.ranking-save-status.pending {
+    color: #fde68a;
+    border-color: rgba(250,204,21,.30);
+}
+
+.ranking-save-status.success {
+    color: #bbf7d0;
+    border-color: rgba(34,197,94,.34);
+    background: rgba(20,83,45,.42);
+}
+
+.ranking-save-status.error {
+    color: #fecaca;
+    border-color: rgba(248,113,113,.34);
+    background: rgba(127,29,29,.36);
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+    .ranking-save-status {
+        margin-top: 4px;
+        padding: 5px 9px;
+        font-size: 9px;
+        border-radius: 8px;
+    }
+}

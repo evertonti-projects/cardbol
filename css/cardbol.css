@@ -4096,3 +4096,37 @@ button.bench-carousel-item:hover {
         border-radius: 10px;
     }
 }
+
+
+/* =========================================================
+   REGRAS COMPLETAS — ROLAGEM INTERNA SEGURA
+========================================================= */
+.rules-pages { overflow: hidden; }
+
+.rules-page {
+    max-height: min(56vh, 430px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 14px;
+}
+
+.rules-page::-webkit-scrollbar { width: 6px; }
+.rules-page::-webkit-scrollbar-thumb {
+    background: rgba(148,163,184,.42);
+    border-radius: 999px;
+}
+.rules-page::-webkit-scrollbar-track {
+    background: rgba(255,255,255,.04);
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+    .rules-page {
+        max-height: 48vh;
+        padding-right: 10px;
+    }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+    .rules-page { max-height: 52vh; }
+}

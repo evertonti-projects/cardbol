@@ -95,52 +95,73 @@
 
         <div class="rules-pages">
             <section class="rules-page active" data-rules-page="0">
-                <h3>1. Objetivo e tempo da partida</h3>
+                <h3>1. Objetivo, campo e início da partida</h3>
                 <ul>
-                    <li>Marque gols no adversário movimentando suas peças pelo campo.</li>
-                    <li>Quem fizer <strong>5 gols primeiro</strong> vence na hora.</li>
-                    <li>Se ninguém chegar a 5, a partida vai até <strong>2 tempos de 10 minutos</strong>.</li>
-                    <li>Cada jogada tem <strong>45 segundos por turno</strong>. Se o tempo acabar, a vez passa.</li>
+                    <li>O objetivo é marcar gols movimentando suas peças pelo tabuleiro. <strong>O primeiro time a fazer 5 gols vence imediatamente.</strong></li>
+                    <li>Também é possível vencer pelo tempo, pelo desempate da prorrogação ou se o adversário ficar reduzido a <strong>GO + 1 jogador</strong>.</li>
+                    <li>O campo possui <strong>18 linhas × 11 colunas</strong> e cada gol tem <strong>3 casas centrais válidas</strong>.</li>
+                    <li>As equipes atacam lados opostos. Duas peças não podem ocupar a mesma casa e nenhuma peça pode atravessar outra peça ou um BLOQUEIO.</li>
+                    <li>Há dois modos: <strong>2 Jogadores</strong> no mesmo dispositivo e <strong>Contra CPU</strong>.</li>
+                    <li>Depois da formação inicial, uma <strong>roleta</strong> define quem dará o pontapé inicial.</li>
                 </ul>
             </section>
 
             <section class="rules-page" data-rules-page="1">
-                <h3>2. Formação inicial</h3>
+                <h3>2. Formação e movimentação das peças</h3>
                 <ul>
-                    <li>Cada time começa com <strong>7 peças</strong>: GO, ZG, LE, LD, ME, MD e ATK.</li>
-                    <li>Antes do jogo, cada lado organiza sua própria formação inicial.</li>
-                    <li>GO fica até a 3ª linha; defesa nas linhas 4–5; meio nas 6–7; ATK nas 8–9.</li>
-                    <li>No intervalo e após gols, o jogo reorganiza a partida respeitando as regras do elenco.</li>
+                    <li>Cada equipe começa com <strong>7 jogadores</strong>: GO, ZG, LE, LD, ME, MD e ATK.</li>
+                    <li>Faixas da formação: <strong>GO</strong> nas linhas 1–3; <strong>ZG/LE/LD</strong> nas 4–5; <strong>ME/MD</strong> nas 6–7; <strong>ATK</strong> nas 8–9 a partir do próprio gol.</li>
+                    <li>Em cada turno, jogue o dado de 1 a 6. Fora da zona final, o valor é o <strong>máximo</strong>: tirou 5, pode andar de 1 a 5 casas.</li>
+                    <li>O movimento acontece em <strong>uma única direção</strong>, sem curvas, dribles ou mudança de direção durante a jogada.</li>
+                    <li><strong>LE, LD, ME e MD</strong>: horizontal ou vertical. <strong>ATK</strong>: horizontal, vertical e diagonal em qualquer área.</li>
+                    <li><strong>ZG</strong>: diagonal somente enquanto permanecer na própria defesa. <strong>GO</strong>: horizontal, vertical e diagonal, mas restrito às 3 linhas próximas do próprio gol.</li>
+                    <li>Nas <strong>3 últimas linhas antes do gol adversário</strong>, qualquer peça deve cumprir obrigatoriamente o valor completo do dado ou da carta.</li>
                 </ul>
             </section>
 
             <section class="rules-page" data-rules-page="2">
-                <h3>3. Como movimentar</h3>
+                <h3>3. Gol, reinício, banco e expulsões</h3>
                 <ul>
-                    <li>Primeiro jogue o dado. O número sorteado é o <strong>máximo</strong> de casas que pode andar.</li>
-                    <li>O movimento deve ser em <strong>uma única direção</strong>, sem curvas e sem atravessar peças ou bloqueios.</li>
-                    <li>LE, LD, ME e MD usam vertical e horizontal. ATK também usa diagonais em todo o campo.</li>
-                    <li>GO e ZG só usam diagonais na defesa. Nas 3 últimas linhas de ataque, a peça deve cumprir a distância completa.</li>
+                    <li>Para marcar, a peça precisa entrar corretamente em uma das <strong>3 casas válidas do gol</strong>, seguindo uma trajetória permitida.</li>
+                    <li>Após o gol, o placar é atualizado, acontece a comemoração e aparece a imagem do jogador que marcou.</li>
+                    <li>Depois de um gol não final, os titulares sobreviventes retornam à formação salva. Jogadores expulsos continuam fora.</li>
+                    <li>A equipe que sofreu o gol fica responsável pela saída da jogada seguinte.</li>
+                    <li>O banco possui reservas de <strong>ATK, ME, MD, LE, LD e ZG</strong>. O máximo é de <strong>10 jogadores ativos</strong> por equipe.</li>
+                    <li>Reservas que já entraram em campo passam a reiniciar, após gols, dentro da faixa normal de sua posição.</li>
+                    <li>Jogadores expulsos permanecem fora até que alguma regra ou carta permita seu retorno.</li>
+                    <li>Se uma equipe ficar apenas com <strong>GO + 1 outro jogador ativo</strong>, perde imediatamente a partida.</li>
                 </ul>
             </section>
 
             <section class="rules-page" data-rules-page="3">
-                <h3>4. Cartas e elenco</h3>
+                <h3>4. Cartas Bônus</h3>
                 <ul>
-                    <li>Tirou <strong>6</strong>? Ganha 1 carta, se houver espaço na mão.</li>
-                    <li>O limite é de <strong>3 cartas na mão</strong> e <strong>10 peças em campo</strong> por time.</li>
-                    <li>As cartas podem expulsar, adicionar reserva, dar passos extras, recuar rival, criar bloqueio e aplicar CATIMBA.</li>
-                    <li>O BLOCK vale para os dois lados e desaparece após o próximo gol.</li>
+                    <li>Cada jogador pode ter até <strong>3 cartas na mão</strong>. Tirando <strong>6</strong> no dado, recebe 1 Carta Bônus se houver slot livre.</li>
+                    <li>Se iniciar o turno com 3 cartas, precisa usar uma antes de lançar o dado.</li>
+                    <li><strong>Carta 1 — TÁ NA RUA!</strong>: expulsa 1 adversário, exceto o GO.</li>
+                    <li><strong>Carta 2 — SANGUE NOVO!</strong>: coloca uma reserva ou jogador expulso de volta em campo, respeitando o limite de 10 ativos. A entrada imediata ocorre nas 3 primeiras linhas defensivas.</li>
+                    <li><strong>Carta 3 — ARRANCADA FULMINANTE!</strong>: move uma peça em até 3 casas.</li>
+                    <li><strong>Carta 4 — PASSE EM PROFUNDIDADE!</strong>: move uma peça em até 2 casas.</li>
+                    <li><strong>Carta 7 — JOGADA ENSAIADA!</strong>: movimenta 3 jogadores diferentes, cada um em até 3 casas.</li>
+                    <li><strong>Carta 8 — BLOQUEIO</strong>: cria uma barreira na própria defesa, intransponível para os dois times, que desaparece após o próximo gol. Não pode ocupar as 3 casas imediatamente em frente ao próprio gol.</li>
+                    <li><strong>Carta 9 — RECUO TÁTICO</strong>: faz um adversário recuar até 5 casas em linha reta em direção à própria defesa; obstáculos e limites reduzem o recuo.</li>
+                    <li><strong>Carta 10 — CATIMBA!</strong>: afeta o próximo turno rival: 1→0, 2/3→1, 4/5→2, 6→3. Se sair 6 sob CATIMBA, <strong>não ganha Carta Bônus</strong>.</li>
+                    <li>Movimentos de cartas também respeitam direção, obstáculos e a regra de distância completa nas 3 últimas linhas de ataque.</li>
                 </ul>
             </section>
 
             <section class="rules-page" data-rules-page="4">
-                <h3>5. Como vencer</h3>
+                <h3>5. Cronômetro, intervalo, prorrogação e vitória</h3>
                 <ul>
-                    <li>Se o tempo acabar, vence quem tiver mais gols.</li>
+                    <li>Cada jogador possui <strong>45 segundos por turno</strong>. Se o tempo acabar, a vez passa automaticamente.</li>
+                    <li>A partida regulamentar tem <strong>2 tempos de 10 minutos</strong>, totalizando 20 minutos.</li>
+                    <li>O cronômetro da partida pausa durante vídeos de cartas, animações, comemorações de gol e telas de transição.</li>
+                    <li>No <strong>intervalo</strong>, cada equipe pode reorganizar as peças que continuam em campo. Expulsos permanecem fora e reservas já utilizadas continuam ativas.</li>
+                    <li>Se os 20 minutos terminarem com diferença no placar, vence quem tiver mais gols.</li>
                     <li>Empate leva a uma <strong>prorrogação de 5 minutos</strong>.</li>
-                    <li>Se seguir empatado, vence quem tiver <strong>mais peças em campo</strong>.</li>
-                    <li>Se ainda empatar, novas prorrogações de 5 minutos continuam até sair um vencedor. Se um time ficar só com GO + 1 jogador, perde na hora.</li>
+                    <li>Ao fim da prorrogação: se houver diferença no placar, vence quem tiver mais gols; se continuar empatado, vence quem tiver <strong>mais jogadores ativos em campo</strong>.</li>
+                    <li>Se também houver empate no número de jogadores, começa outra prorrogação de 5 minutos. O processo se repete até existir um vencedor.</li>
+                    <li>Lembrete: <strong>5 gols vence imediatamente</strong> em qualquer momento da partida.</li>
                 </ul>
             </section>
         </div>

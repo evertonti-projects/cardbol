@@ -582,8 +582,7 @@ async function requestCardBolLogin(username, pin) {
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "apikey": SUPABASE_PUBLISHABLE_KEY,
-            "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
+            "apikey": SUPABASE_PUBLISHABLE_KEY
         },
         body: JSON.stringify({
             p_username: username,
@@ -595,11 +594,17 @@ async function requestCardBolLogin(username, pin) {
         let detail = "";
         try {
             const errorPayload = await response.json();
-            detail = errorPayload?.message || errorPayload?.details || "";
+            const parts = [
+                errorPayload?.message,
+                errorPayload?.details,
+                errorPayload?.hint,
+                errorPayload?.code ? `código ${errorPayload.code}` : ""
+            ].filter(Boolean);
+            detail = parts.join(" • ");
         } catch(error) {
-            // Mantém mensagem genérica abaixo.
+            // Mantém o status HTTP abaixo se não houver JSON de erro.
         }
-        throw new Error(detail || `Falha de conexão (${response.status})`);
+        throw new Error(detail || `HTTP ${response.status}`);
     }
 
     const payload = await response.json();
@@ -682,7 +687,13 @@ async function submitPlayerIdentity(event) {
 
     } catch(connectionError) {
         console.error("CardBol login:", connectionError);
-        if(error) error.textContent = "Não foi possível conectar ao ranking. Verifique sua internet e tente novamente.";
+
+        const detail = String(connectionError?.message || "").trim();
+        if(error) {
+            error.textContent = detail
+                ? `Erro no ranking: ${detail}`
+                : "Não foi possível conectar ao ranking. Tente novamente.";
+        }
     } finally {
         playerIdentitySubmitting = false;
         if(submitButton) {

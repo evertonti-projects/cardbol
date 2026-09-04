@@ -245,6 +245,14 @@
                 <small>Escolha seu clube e o time da CPU</small>
             </button>
         </div>
+
+        <button
+            class="game-mode-ranking-button"
+            type="button"
+            onclick="openRankingOverlay()"
+        >
+            🏆 VER RANKING
+        </button>
     </div>
 </div>
 
@@ -438,6 +446,7 @@
         <div id="message" class="message">⚙️ Defina a formação inicial.</div>
         <button id="formationConfirmButton" class="formation-confirm-button red-formation" type="button" onclick="confirmFormation()">✓ CONFIRMAR BARCELONA</button>
         <button id="fullscreenButton" class="fullscreen-button" type="button" onclick="toggleFullscreen()" aria-pressed="false">⛶ TELA CHEIA</button>
+        <button id="rankingGameButton" class="ranking-game-button" type="button" onclick="openRankingOverlay()">🏆 RANKING</button>
         <button class="new-game" onclick="newGame()">↻ REINICIAR 0 × 0</button>
     </div>
 
@@ -617,6 +626,15 @@
             aria-live="polite"
         ></div>
 
+        <button
+            id="victoryRankingButton"
+            class="victory-ranking-button"
+            type="button"
+            onclick="openRankingOverlay()"
+        >
+            🏆 VER RANKING
+        </button>
+
 
         <button
             id="victoryButton"
@@ -633,6 +651,71 @@
 
 </div>
 
+
+<div
+    id="rankingOverlay"
+    class="ranking-overlay"
+    aria-hidden="true"
+    onclick="handleRankingBackdrop(event)"
+>
+    <div class="ranking-panel" role="dialog" aria-modal="true" aria-labelledby="rankingTitle">
+        <div class="ranking-header">
+            <div>
+                <div class="ranking-kicker">CARDBOL • CLASSIFICAÇÃO GERAL</div>
+                <h2 id="rankingTitle" class="ranking-title">🏆 RANKING</h2>
+            </div>
+
+            <button
+                class="ranking-close-button"
+                type="button"
+                onclick="closeRankingOverlay()"
+                aria-label="Fechar ranking"
+            >
+                ✕
+            </button>
+        </div>
+
+        <div class="ranking-summary">
+            Vitória <strong>+3 pts</strong> • Derrota <strong>−1 pt</strong>
+        </div>
+
+        <div id="rankingLoading" class="ranking-loading">
+            ⏳ Carregando classificação...
+        </div>
+
+        <div id="rankingError" class="ranking-error"></div>
+
+        <div id="rankingEmpty" class="ranking-empty">
+            Ainda não há partidas oficiais registradas.
+        </div>
+
+        <div id="rankingTableWrap" class="ranking-table-wrap">
+            <table class="ranking-table">
+                <thead>
+                    <tr>
+                        <th># POSIÇÃO</th>
+                        <th>JOGADOR</th>
+                        <th>PONTOS</th>
+                        <th>VITÓRIAS</th>
+                        <th>GOLS MARCADOS</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="ranking-footer">
+            <span id="rankingUpdatedAt">Ranking online</span>
+            <button
+                class="ranking-refresh-button"
+                type="button"
+                onclick="loadRankingData()"
+            >
+                ↻ ATUALIZAR
+            </button>
+        </div>
+    </div>
+</div>
 
 <script src="js/cardbol.js"></script>
 

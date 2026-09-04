@@ -613,6 +613,201 @@ async function requestCardBolLogin(username, pin) {
 }
 
 
+
+let rankingOverlayOpen = false;
+let rankingRequestSequence = 0;
+
+function getRankingPositionLabel(position) {
+    const number = Number(position) || 0;
+
+    if(number === 1) return "🥇 1";
+    if(number === 2) return "🥈 2";
+    if(number === 3) return "🥉 3";
+
+    return String(number);
+}
+
+function escapeRankingText(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+async function requestCardBolRanking(limit = 100) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_ranking`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_PUBLISHABLE_KEY
+        },
+        body: JSON.stringify({
+            p_limit: Math.max(1, Math.min(Number(limit) || 100, 500))
+        })
+    });
+
+    if(!response.ok) {
+        let detail = "";
+
+        try {
+            const errorPayload = await response.json();
+            const parts = [
+                errorPayload?.message,
+                errorPayload?.details,
+                errorPayload?.hint,
+                errorPayload?.code ? `código ${errorPayload.code}` : ""
+            ].filter(Boolean);
+
+            detail = parts.join(" • ");
+        } catch(error) {
+            // Usa status HTTP abaixo.
+        }
+
+        throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload) ? payload : [];
+}
+
+function renderRankingRows(rows) {
+    const body = document.getElementById("rankingTableBody");
+    const tableWrap = document.getElementById("rankingTableWrap");
+    const empty = document.getElementById("rankingEmpty");
+
+    if(!body || !tableWrap || !empty) return;
+
+    body.innerHTML = "";
+
+    if(!rows.length) {
+        tableWrap.style.display = "none";
+        empty.style.display = "block";
+        return;
+    }
+
+    empty.style.display = "none";
+    tableWrap.style.display = "block";
+
+    const loggedUsername = String(currentUserIdentity.username || "").trim().toLowerCase();
+
+    rows.forEach(row => {
+        const position = Number(row.ranking_position ?? 0);
+        const playerNameValue = String(row.player_name ?? "");
+        const points = Number(row.ranking_points ?? row.points ?? 0);
+        const wins = Number(row.ranking_wins ?? row.wins ?? 0);
+        const goals = Number(row.goals_scored ?? 0);
+
+        const tr = document.createElement("tr");
+
+        if(
+            loggedUsername &&
+            playerNameValue.trim().toLowerCase() === loggedUsername
+        ) {
+            tr.classList.add("ranking-current-user");
+        }
+
+        if(position >= 1 && position <= 3) {
+            tr.classList.add(`ranking-top-${position}`);
+        }
+
+        tr.innerHTML = `
+            <td class="ranking-position-cell">${escapeRankingText(getRankingPositionLabel(position))}</td>
+            <td class="ranking-player-cell">${escapeRankingText(playerNameValue)}</td>
+            <td>${points}</td>
+            <td>${wins}</td>
+            <td>${goals}</td>
+        `;
+
+        body.appendChild(tr);
+    });
+}
+
+async function loadRankingData() {
+    const loading = document.getElementById("rankingLoading");
+    const error = document.getElementById("rankingError");
+    const empty = document.getElementById("rankingEmpty");
+    const tableWrap = document.getElementById("rankingTableWrap");
+    const updatedAt = document.getElementById("rankingUpdatedAt");
+
+    const requestId = ++rankingRequestSequence;
+
+    if(loading) loading.style.display = "block";
+    if(error) {
+        error.style.display = "none";
+        error.textContent = "";
+    }
+    if(empty) empty.style.display = "none";
+    if(tableWrap) tableWrap.style.display = "none";
+
+    try {
+        const rows = await requestCardBolRanking(100);
+
+        if(requestId !== rankingRequestSequence) return;
+
+        renderRankingRows(rows);
+
+        if(updatedAt) {
+            updatedAt.textContent =
+                `Atualizado às ${new Date().toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                })}`;
+        }
+    } catch(fetchError) {
+        console.error("CardBol ranking list:", fetchError);
+
+        if(requestId !== rankingRequestSequence) return;
+
+        if(error) {
+            error.textContent =
+                `⚠ Não foi possível carregar o ranking: ${String(fetchError?.message || "erro desconhecido")}`;
+            error.style.display = "block";
+        }
+    } finally {
+        if(requestId === rankingRequestSequence && loading) {
+            loading.style.display = "none";
+        }
+    }
+}
+
+function openRankingOverlay() {
+    const overlay = document.getElementById("rankingOverlay");
+    if(!overlay) return;
+
+    rankingOverlayOpen = true;
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+
+    loadRankingData();
+}
+
+function closeRankingOverlay() {
+    const overlay = document.getElementById("rankingOverlay");
+    if(!overlay) return;
+
+    rankingOverlayOpen = false;
+    rankingRequestSequence += 1;
+
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+function handleRankingBackdrop(event) {
+    if(event?.target === event?.currentTarget) {
+        closeRankingOverlay();
+    }
+}
+
+document.addEventListener("keydown", event => {
+    if(event.key === "Escape" && rankingOverlayOpen) {
+        closeRankingOverlay();
+    }
+});
+
+
 function createCardBolMatchKey() {
     if(window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID();
@@ -741,6 +936,13 @@ async function registerOfficialMatchToRanking(winningPlayer) {
                 "✓ Esta partida já estava registrada no ranking.",
                 "success"
             );
+
+            setTimeout(() => {
+                if(currentMatchKey === submittedMatchKey && winner !== null) {
+                    openRankingOverlay();
+                }
+            }, 900);
+
             return;
         }
 
@@ -750,6 +952,14 @@ async function registerOfficialMatchToRanking(winningPlayer) {
             `✓ Resultado registrado no ranking • ${pointsLabel} pt${Math.abs(pointsDelta) === 1 ? "" : "s"}`,
             "success"
         );
+
+        // No fim da partida, mostra automaticamente a classificação
+        // já com o resultado recém-gravado.
+        setTimeout(() => {
+            if(currentMatchKey === submittedMatchKey && winner !== null) {
+                openRankingOverlay();
+            }
+        }, 900);
 
     } catch(error) {
         console.error("CardBol ranking:", error);
@@ -7518,7 +7728,8 @@ function isClockPlayActive() {
         !goalPause &&
         winner === null &&
         !cardVideoActive &&
-        !moveAnimationActive
+        !moveAnimationActive &&
+        !rankingOverlayOpen
     );
 }
 
@@ -8525,6 +8736,11 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
     const title = document.getElementById("victoryTitle");
     const text = document.getElementById("victoryText");
     const button = document.getElementById("victoryButton");
+    const rankingButton = document.getElementById("victoryRankingButton");
+
+    if(rankingButton) {
+        rankingButton.style.display = matchEnded ? "inline-flex" : "none";
+    }
 
     const isBlue = scoringPlayer === 0;
     const name = playerName(scoringPlayer);
@@ -8730,6 +8946,7 @@ function newGame() {
     currentMatchKey = createCardBolMatchKey();
     matchRankingSubmissionStarted = false;
     setRankingSaveStatus("", "");
+    closeRankingOverlay();
 
     lastCardsRenderSignature = "";
     benchCarouselRenderSignatures = {};

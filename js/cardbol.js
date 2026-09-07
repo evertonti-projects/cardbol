@@ -1578,12 +1578,39 @@ function restoreOnlineGameState(state) {
         matchClockRunning = state.matchClockRunning === true;
         periodBreakActive = state.periodBreakActive === true;
         periodBreakType = state.periodBreakType || null;
-        initialKickoffPlayer = (Number(state.initialKickoffPlayer) === 0 || Number(state.initialKickoffPlayer) === 1)
-            ? Number(state.initialKickoffPlayer)
+        const remoteKickoffRaw = state.initialKickoffPlayer;
+        initialKickoffPlayer = (
+            remoteKickoffRaw === 0 || remoteKickoffRaw === 1 ||
+            remoteKickoffRaw === "0" || remoteKickoffRaw === "1"
+        )
+            ? Number(remoteKickoffRaw)
             : initialKickoffPlayer;
-        winner = (Number(state.winner) === 0 || Number(state.winner) === 1) ? Number(state.winner) : null;
+
+        // IMPORTANTE: Number(null) === 0 em JavaScript.
+        // No multiplayer isso fazia um snapshot normal com winner:null
+        // virar winner=0 (lado azul) e encerrava a partida em 0x0.
+        const remoteWinnerRaw = state.winner;
+        winner = (
+            remoteWinnerRaw === 0 || remoteWinnerRaw === 1 ||
+            remoteWinnerRaw === "0" || remoteWinnerRaw === "1"
+        )
+            ? Number(remoteWinnerRaw)
+            : null;
         matchEndReason = state.matchEndReason || null;
         matchEndDetail = state.matchEndDetail || "";
+
+        // Segunda camada de segurança para snapshots online:
+        // vitória por gols só é válida se o vencedor realmente alcançou o placar-alvo.
+        if(winner !== null && (matchEndReason === "goals" || matchEndReason === "game" || matchEndReason === null)) {
+            const winnerScore = winner === 1 ? scoreRed : scoreBlue;
+            if(winnerScore < WINNING_SCORE) {
+                winner = null;
+                if(matchEndReason === "goals" || matchEndReason === "game") {
+                    matchEndReason = null;
+                    matchEndDetail = "";
+                }
+            }
+        }
         goalPause = state.goalPause === true;
         lastGoalScorer = state.lastGoalScorer ? {...state.lastGoalScorer} : null;
         if(Array.isArray(state.startingFormation)) startingFormation = state.startingFormation;

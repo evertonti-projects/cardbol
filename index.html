@@ -373,7 +373,15 @@
             <div id="onlineReadyBox" class="online-ready-box">
                 <strong>✅ LOBBY PRONTO!</strong>
                 <span>Os dois jogadores estão conectados e os clubes foram definidos.</span>
-                <small>Na próxima etapa vamos sincronizar formação, dado, movimentos e cartas.</small>
+                <small id="onlineReadyHint">O criador da sala pode iniciar a formação.</small>
+                <button
+                    id="onlineStartFormationButton"
+                    class="online-start-formation-button"
+                    type="button"
+                    onclick="startOnlineFormation()"
+                >
+                    ⚽ INICIAR FORMAÇÃO
+                </button>
             </div>
 
             <div id="onlineRoomError" class="online-lobby-error"></div>

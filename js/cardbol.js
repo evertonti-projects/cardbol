@@ -1208,10 +1208,11 @@ function finishRulesFlow() {
 
 
 // ============================================================
-// MULTIPLAYER ONLINE — FASE 1 / LOBBY BETA
-// Sincronização leve por polling. O tabuleiro ainda NÃO inicia.
+// MULTIPLAYER ONLINE — FASE 2 / FORMAÇÃO + PONTAPÉ INICIAL
+// Lobby e formação sincronizados via Supabase.
 // ============================================================
 const ONLINE_LOBBY_POLL_MS = 1500;
+const ONLINE_SETUP_POLL_MS = 1200;
 
 let onlineLobbyState = {
     roomId: null,
@@ -1224,14 +1225,34 @@ let onlineLobbyState = {
     guestPlayerId: null,
     guestUsername: "",
     guestClub: "",
+    hostFormation: null,
+    guestFormation: null,
+    hostFormationConfirmed: false,
+    guestFormationConfirmed: false,
+    kickoffPlayer: null,
     pollingTimer: null,
-    requestBusy: false
+    setupPollingTimer: null,
+    requestBusy: false,
+    formationModeStarted: false,
+    kickoffShown: false,
+    formationSubmitBusy: false,
+    gameplayLocked: true
 };
 
-function resetOnlineLobbyState() {
+function clearOnlineLobbyTimers() {
     if(onlineLobbyState.pollingTimer) {
         clearInterval(onlineLobbyState.pollingTimer);
+        onlineLobbyState.pollingTimer = null;
     }
+
+    if(onlineLobbyState.setupPollingTimer) {
+        clearInterval(onlineLobbyState.setupPollingTimer);
+        onlineLobbyState.setupPollingTimer = null;
+    }
+}
+
+function resetOnlineLobbyState() {
+    clearOnlineLobbyTimers();
 
     onlineLobbyState = {
         roomId: null,
@@ -1244,9 +1265,35 @@ function resetOnlineLobbyState() {
         guestPlayerId: null,
         guestUsername: "",
         guestClub: "",
+        hostFormation: null,
+        guestFormation: null,
+        hostFormationConfirmed: false,
+        guestFormationConfirmed: false,
+        kickoffPlayer: null,
         pollingTimer: null,
-        requestBusy: false
+        setupPollingTimer: null,
+        requestBusy: false,
+        formationModeStarted: false,
+        kickoffShown: false,
+        formationSubmitBusy: false,
+        gameplayLocked: true
     };
+}
+
+function isOnlineMode() {
+    return gameMode === "online";
+}
+
+function getOnlineLocalPlayerIndex() {
+    return onlineLobbyState.callerSide === "host" ? 1 : 0;
+}
+
+function isOnlineLocalFormationConfirmed() {
+    if(!isOnlineMode()) return false;
+
+    return onlineLobbyState.callerSide === "host"
+        ? onlineLobbyState.hostFormationConfirmed
+        : onlineLobbyState.guestFormationConfirmed;
 }
 
 function normalizeOnlineRoomCode(input) {
@@ -1391,6 +1438,10 @@ function applyOnlineRoomData(result) {
     }
 
     renderOnlineLobby();
+
+    if(["formation", "kickoff", "playing"].includes(onlineLobbyState.roomStatus)) {
+        beginOnlineFormationStage();
+    }
 }
 
 function startOnlineLobbyPolling() {
@@ -1401,6 +1452,302 @@ function startOnlineLobbyPolling() {
     onlineLobbyState.pollingTimer = setInterval(() => {
         refreshOnlineRoom();
     }, ONLINE_LOBBY_POLL_MS);
+}
+
+function stopOnlineLobbyPolling() {
+    if(onlineLobbyState.pollingTimer) {
+        clearInterval(onlineLobbyState.pollingTimer);
+        onlineLobbyState.pollingTimer = null;
+    }
+}
+
+function startOnlineSetupPolling() {
+    if(onlineLobbyState.setupPollingTimer) {
+        clearInterval(onlineLobbyState.setupPollingTimer);
+    }
+
+    onlineLobbyState.setupPollingTimer = setInterval(() => {
+        refreshOnlineSetup();
+    }, ONLINE_SETUP_POLL_MS);
+}
+
+function serializeFormationForPlayer(player) {
+    return pieces
+        .filter(piece => (
+            piece.player === player &&
+            !piece.reserve &&
+            Number.isInteger(piece.id)
+        ))
+        .sort((a,b) => a.id - b.id)
+        .map(piece => ({
+            id: piece.id,
+            role: piece.role,
+            row: piece.row,
+            col: piece.col
+        }));
+}
+
+function applyFormationSnapshotToPlayer(player, formation) {
+    if(!Array.isArray(formation) || formation.length !== PLAYER_ROLES.length) return;
+
+    formation.forEach(item => {
+        const id = Number(item?.id);
+        const row = Number(item?.row);
+        const col = Number(item?.col);
+        const role = String(item?.role || "");
+
+        if(
+            !Number.isInteger(id) ||
+            !Number.isInteger(row) ||
+            !Number.isInteger(col)
+        ) return;
+
+        const piece = pieces.find(candidate => (
+            candidate.player === player &&
+            Number(candidate.id) === id &&
+            !candidate.reserve
+        ));
+
+        if(!piece) return;
+
+        piece.row = row;
+        piece.col = col;
+        if(PLAYER_ROLES.includes(role)) piece.role = role;
+    });
+
+    saveFormationForPlayer(player);
+}
+
+function applyOnlineSetupData(result) {
+    if(!result || result.success !== true) {
+        const status = result?.status || "UNKNOWN";
+        throw new Error(`Configuração online indisponível (${status}).`);
+    }
+
+    onlineLobbyState.roomStatus = result.room_status || onlineLobbyState.roomStatus;
+    onlineLobbyState.callerSide = result.caller_side || onlineLobbyState.callerSide;
+
+    onlineLobbyState.hostFormation = result.host_formation || null;
+    onlineLobbyState.guestFormation = result.guest_formation || null;
+    onlineLobbyState.hostFormationConfirmed = result.host_formation_confirmed === true;
+    onlineLobbyState.guestFormationConfirmed = result.guest_formation_confirmed === true;
+    const kickoffValue = Number(result.kickoff_player);
+    onlineLobbyState.kickoffPlayer = (kickoffValue === 0 || kickoffValue === 1)
+        ? kickoffValue
+        : null;
+
+    if(Array.isArray(onlineLobbyState.hostFormation)) {
+        applyFormationSnapshotToPlayer(1, onlineLobbyState.hostFormation);
+    }
+
+    if(Array.isArray(onlineLobbyState.guestFormation)) {
+        applyFormationSnapshotToPlayer(0, onlineLobbyState.guestFormation);
+    }
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    const localConfirmed = isOnlineLocalFormationConfirmed();
+    const opponentConfirmed = localPlayer === 1
+        ? onlineLobbyState.guestFormationConfirmed
+        : onlineLobbyState.hostFormationConfirmed;
+
+    if(formationSetupActive && isOnlineMode()) {
+        if(localConfirmed && !opponentConfirmed) {
+            setMessage("🌐 Formação enviada. Aguardando o adversário confirmar a dele...", 0);
+        } else if(!localConfirmed && opponentConfirmed) {
+            setMessage("🌐 O adversário já confirmou. Finalize sua formação e confirme.", 0);
+        }
+        render();
+    }
+
+    if(
+        onlineLobbyState.roomStatus === "kickoff" &&
+        onlineLobbyState.hostFormationConfirmed &&
+        onlineLobbyState.guestFormationConfirmed &&
+        (onlineLobbyState.kickoffPlayer === 0 || onlineLobbyState.kickoffPlayer === 1)
+    ) {
+        prepareOnlineKickoffFromServer();
+    }
+}
+
+async function startOnlineFormation() {
+    if(
+        onlineLobbyState.callerSide !== "host" ||
+        onlineLobbyState.roomStatus !== "ready" ||
+        onlineLobbyState.requestBusy
+    ) return;
+
+    const button = document.getElementById("onlineStartFormationButton");
+
+    onlineLobbyState.requestBusy = true;
+    if(button) {
+        button.disabled = true;
+        button.textContent = "⏳ INICIANDO...";
+    }
+
+    try {
+        const result = await onlineRpc("cardbol_online_start_formation", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+
+        applyOnlineRoomData(result);
+    } catch(error) {
+        setOnlineLobbyError(
+            `⚠ ${String(error?.message || "Não foi possível iniciar a formação.")}`,
+            true
+        );
+    } finally {
+        onlineLobbyState.requestBusy = false;
+        if(button) {
+            button.disabled = false;
+            button.textContent = "⚽ INICIAR FORMAÇÃO";
+        }
+    }
+}
+
+function beginOnlineFormationStage() {
+    if(!isOnlineMode()) return;
+
+    if(!onlineLobbyState.formationModeStarted) {
+        onlineLobbyState.formationModeStarted = true;
+        stopOnlineLobbyPolling();
+        hideOnlineLobbyOverlayOnly();
+
+        newGame();
+
+        formationSetupActive = true;
+        formationSetupReason = "initial";
+        formationSetupPlayer = getOnlineLocalPlayerIndex();
+        formationSelectedPiece = null;
+        selectedPiece = null;
+        onlineLobbyState.gameplayLocked = true;
+
+        applyTeamBranding();
+
+        const localPlayer = getOnlineLocalPlayerIndex();
+        const sideEmoji = localPlayer === 1 ? "🔴" : "🔵";
+
+        setMessage(
+            `${sideEmoji} 🌐 SUA FORMAÇÃO: organize apenas ${playerName(localPlayer)} e confirme. O adversário monta o outro lado no dispositivo dele.`,
+            0
+        );
+
+        render();
+        startOnlineSetupPolling();
+        refreshOnlineSetup();
+    }
+}
+
+async function refreshOnlineSetup() {
+    if(
+        !onlineLobbyState.roomCode ||
+        !isOnlineMode() ||
+        onlineLobbyState.formationSubmitBusy
+    ) return;
+
+    try {
+        const result = await onlineRpc("cardbol_online_get_setup", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+
+        applyOnlineSetupData(result);
+    } catch(error) {
+        console.warn("CardBol online setup:", error);
+        setMessage(`⚠ Online: ${String(error?.message || "falha ao sincronizar formação")}`, 0);
+    }
+}
+
+async function confirmOnlineFormation() {
+    if(
+        !isOnlineMode() ||
+        !formationSetupActive ||
+        onlineLobbyState.formationSubmitBusy ||
+        isOnlineLocalFormationConfirmed()
+    ) return;
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    const formation = serializeFormationForPlayer(localPlayer);
+
+    if(formation.length !== PLAYER_ROLES.length) {
+        setMessage("⚠ Não foi possível montar a formação completa.", 0);
+        return;
+    }
+
+    saveFormationForPlayer(localPlayer);
+    formationSelectedPiece = null;
+    onlineLobbyState.formationSubmitBusy = true;
+    render();
+
+    setMessage("🌐 Enviando sua formação ao adversário...", 0);
+
+    try {
+        const result = await onlineRpc("cardbol_online_confirm_formation", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_formation: formation
+        });
+
+        applyOnlineSetupData(result);
+    } catch(error) {
+        setMessage(`⚠ Não foi possível confirmar a formação: ${String(error?.message || "erro online")}`, 0);
+    } finally {
+        onlineLobbyState.formationSubmitBusy = false;
+        render();
+    }
+}
+
+function prepareOnlineKickoffFromServer() {
+    if(onlineLobbyState.kickoffShown) return;
+
+    onlineLobbyState.kickoffShown = true;
+
+    if(onlineLobbyState.setupPollingTimer) {
+        clearInterval(onlineLobbyState.setupPollingTimer);
+        onlineLobbyState.setupPollingTimer = null;
+    }
+
+    if(Array.isArray(onlineLobbyState.hostFormation)) {
+        applyFormationSnapshotToPlayer(1, onlineLobbyState.hostFormation);
+    }
+
+    if(Array.isArray(onlineLobbyState.guestFormation)) {
+        applyFormationSnapshotToPlayer(0, onlineLobbyState.guestFormation);
+    }
+
+    formationSetupActive = false;
+    formationSetupPlayer = null;
+    formationSelectedPiece = null;
+    selectedPiece = null;
+    kickoffDrawPending = true;
+    kickoffResolved = false;
+    kickoffRouletteSpinning = false;
+
+    setMessage("🎯 Formações online sincronizadas! Sorteando o pontapé inicial...", 0);
+    render();
+    showKickoffRoulette();
+
+    // Nos dois dispositivos a roleta começa sozinha, mas termina no
+    // mesmo jogador definido pelo Supabase.
+    setTimeout(() => {
+        if(isOnlineMode() && kickoffDrawPending && !kickoffRouletteSpinning) {
+            spinKickoffRoulette();
+        }
+    }, 650);
+}
+
+async function markOnlineRoomPlaying() {
+    if(!isOnlineMode() || !onlineLobbyState.roomCode) return;
+
+    try {
+        await onlineRpc("cardbol_online_mark_playing", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+        onlineLobbyState.roomStatus = "playing";
+    } catch(error) {
+        console.warn("CardBol online playing:", error);
+    }
 }
 
 async function createOnlineRoom() {
@@ -1566,6 +1913,8 @@ function renderOnlineLobby() {
     const clubTitle = document.getElementById("onlineClubTitle");
     const clubGrid = document.getElementById("onlineClubGrid");
     const readyBox = document.getElementById("onlineReadyBox");
+    const startFormationButton = document.getElementById("onlineStartFormationButton");
+    const readyHint = document.getElementById("onlineReadyHint");
 
     if(code) code.textContent = onlineLobbyState.roomCode || "------";
 
@@ -1616,6 +1965,18 @@ function renderOnlineLobby() {
 
     if(readyBox) {
         readyBox.style.display = ready ? "flex" : "none";
+    }
+
+    if(startFormationButton) {
+        const canStart = ready && onlineLobbyState.callerSide === "host";
+        startFormationButton.style.display = canStart ? "inline-flex" : "none";
+        startFormationButton.disabled = !canStart;
+    }
+
+    if(readyHint && ready) {
+        readyHint.textContent = onlineLobbyState.callerSide === "host"
+            ? "Você criou a sala. Inicie a formação quando estiver pronto."
+            : "Aguardando o criador da sala iniciar a formação.";
     }
 
     if(!hasGuest || !clubGrid) return;
@@ -1867,10 +2228,13 @@ function applyTeamBranding() {
 
     const modeButtons = document.querySelectorAll(".game-mode-button small");
     if(modeButtons[0]) {
-        modeButtons[0].textContent = "Escolha os dois clubes desta partida";
+        modeButtons[0].textContent = "Dois jogadores no mesmo dispositivo";
     }
     if(modeButtons[1]) {
-        modeButtons[1].textContent = "Escolha seu clube e o time da CPU";
+        modeButtons[1].textContent = "Crie uma sala ou entre com um código";
+    }
+    if(modeButtons[2]) {
+        modeButtons[2].textContent = "Escolha seu clube e o time da CPU";
     }
 }
 
@@ -3709,6 +4073,12 @@ function saveFormationForPlayer(player) {
 
 function selectFormationPiece(piece) {
     if(!formationSetupActive) return false;
+
+    if(isOnlineMode() && isOnlineLocalFormationConfirmed()) {
+        setMessage("🌐 Sua formação já foi confirmada. Aguarde o adversário.", 0);
+        return true;
+    }
+
     if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
         setMessage("🤖 A CPU REAL MADRID está escolhendo a própria formação.",0);
         return true;
@@ -3738,6 +4108,12 @@ function selectFormationPiece(piece) {
 
 function handleFormationCellClick(row, col) {
     if(!formationSetupActive) return false;
+
+    if(isOnlineMode() && isOnlineLocalFormationConfirmed()) {
+        setMessage("🌐 Sua formação já foi confirmada. Aguarde o adversário.", 0);
+        return true;
+    }
+
     if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
         setMessage(`🤖 Aguarde a CPU ${playerName(CPU_PLAYER)} concluir a formação.`,0);
         return true;
@@ -3906,6 +4282,12 @@ function completeFormationSetup() {
 
 function confirmFormation() {
     if(!formationSetupActive) return;
+
+    if(isOnlineMode()) {
+        confirmOnlineFormation();
+        return;
+    }
+
     if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
         setMessage("🤖 A CPU define a formação REAL MADRID automaticamente.",0);
         return;
@@ -7739,6 +8121,11 @@ function selectPiece(
     piece
 ) {
 
+    if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive) {
+        setMessage("🌐 Aguarde: as jogadas online ainda estão bloqueadas nesta etapa beta.", 0);
+        return;
+    }
+
     if(moveAnimationActive) return;
     if(isCpuTurn() && !formationSetupActive) {
         setMessage("🤖 Aguarde: a CPU REAL MADRID está jogando.");
@@ -7865,6 +8252,11 @@ function handleCellClick(
     row,
     col
 ) {
+
+    if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive) {
+        setMessage("🌐 Aguarde: as jogadas online ainda estão bloqueadas nesta etapa beta.", 0);
+        return;
+    }
 
     if(cardVideoActive) return;
     if(isCpuTurn() && !formationSetupActive) {
@@ -8100,6 +8492,11 @@ function playNextDiceRollAudio() {
 // ============================================================
 
 function rollDice() {
+
+    if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive && !kickoffDrawPending) {
+        setMessage("🌐 Formação e pontapé já estão sincronizados. As jogadas online serão liberadas na próxima etapa.", 0);
+        return;
+    }
 
     if(periodBreakActive) {
         setMessage("⏱ Aguarde o início do próximo tempo.", 0);
@@ -9159,7 +9556,10 @@ function updateInterface() {
     if(formationSetupActive) {
         const isRed = formationSetupPlayer === 1;
 
-        setTurnDisplay(isRed ? `FORMAÇÃO ${playerName(1)}` : (isCpuMode() ? `CPU MONTANDO ${playerName(0)}` : `FORMAÇÃO ${playerName(0)}`));
+        setTurnDisplay(isOnlineMode()
+            ? `🌐 SUA FORMAÇÃO • ${playerName(formationSetupPlayer)}`
+            : (isRed ? `FORMAÇÃO ${playerName(1)}` : (isCpuMode() ? `CPU MONTANDO ${playerName(0)}` : `FORMAÇÃO ${playerName(0)}`))
+        );
         (isRed ? red : blue).classList.add("active");
 
         document.querySelectorAll(".dice-button").forEach(button => {
@@ -9172,6 +9572,17 @@ function updateInterface() {
             confirmButton.textContent = formationSetupReason === "halftime"
                 ? (isRed ? `✓ CONFIRMAR ${playerName(1)} • 2º TEMPO` : `✓ CONFIRMAR ${playerName(0)} • 2º TEMPO`)
                 : (isRed ? `✓ CONFIRMAR ${playerName(1)}` : `✓ CONFIRMAR ${playerName(0)}`);
+
+            if(isOnlineMode()) {
+                const confirmed = isOnlineLocalFormationConfirmed();
+                confirmButton.disabled = confirmed || onlineLobbyState.formationSubmitBusy;
+                confirmButton.textContent = confirmed
+                    ? "✓ FORMAÇÃO ENVIADA • AGUARDANDO"
+                    : (onlineLobbyState.formationSubmitBusy ? "⏳ ENVIANDO FORMAÇÃO..." : `✓ CONFIRMAR ${playerName(formationSetupPlayer)}`);
+            } else {
+                confirmButton.disabled = false;
+            }
+
             if(isCpuMode() && !isRed) confirmButton.classList.add("hidden");
         }
 
@@ -9201,7 +9612,7 @@ function updateInterface() {
     }
 
     document.querySelectorAll(".dice-button").forEach(button => {
-        button.disabled = isCpuTurn();
+        button.disabled = isCpuTurn() || (isOnlineMode() && onlineLobbyState.gameplayLocked);
     });
 
 }
@@ -9858,7 +10269,23 @@ function spinKickoffRoulette() {
 
     // 8 setores iguais: 4 do lado azul + 4 do lado vermelho.
     const sectors = getKickoffSectors();
-    const sectorIndex = Math.floor(Math.random() * sectors.length);
+
+    let sectorIndex;
+
+    if(
+        isOnlineMode() &&
+        (onlineLobbyState.kickoffPlayer === 0 || onlineLobbyState.kickoffPlayer === 1)
+    ) {
+        const candidates = sectors
+            .map((candidate, index) => ({ candidate, index }))
+            .filter(item => item.candidate.player === onlineLobbyState.kickoffPlayer);
+
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        sectorIndex = chosen?.index ?? 0;
+    } else {
+        sectorIndex = Math.floor(Math.random() * sectors.length);
+    }
+
     const sector = sectors[sectorIndex];
 
     // Centro do setor escolhido. O ponteiro fica no topo (0°).
@@ -9910,6 +10337,25 @@ function spinKickoffRoulette() {
         // Deixa o resultado à vista por um instante antes de liberar o campo.
         setTimeout(() => {
             closeKickoffRoulette();
+
+            if(isOnlineMode()) {
+                onlineLobbyState.gameplayLocked = true;
+                matchClockRunning = false;
+                markOnlineRoomPlaying();
+
+                document.querySelectorAll(".dice-button").forEach(diceButton => {
+                    diceButton.disabled = true;
+                });
+
+                setMessage(
+                    `🌐 ${sector.name} venceu o sorteio. Formação e pontapé inicial sincronizados nos dois dispositivos.`,
+                    0
+                );
+
+                render();
+                return;
+            }
+
             startMatchClock();
 
             if(isCpuTurn()) {

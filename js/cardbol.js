@@ -1820,6 +1820,8 @@ function startOnlineGamePolling() {
     onlineGamePollingTimer = setInterval(pollOnlineGameState, ONLINE_GAME_POLL_MS);
 }
 
+// Durante lobby/formação/roleta esta chamada serve apenas como heartbeat.
+// A função do Supabase NÃO pode contabilizar interrupção antes de status=playing.
 async function pollOnlinePresenceDuringSetup() {
     if(!isOnlineMode() || !onlineLobbyState.roomCode) return;
     try {
@@ -10597,6 +10599,47 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
                 : `Jogador do ${name}, autor do gol`;
 
         goalScorerImage.style.display = scorerImage ? "block" : "none";
+    }
+
+    // Vitória online por abandono/desconexão NÃO é gol.
+    // Mostra uma tela de campeão própria, sem GOOOOOL, sem autor do gol
+    // e sem alterar o placar.
+    if(matchEnded && (matchEndReason === "interruptions" || matchEndReason === "reconnect_timeout")) {
+        playFinalVictoryAudio();
+
+        const championImage = document.getElementById("championImage");
+
+        overlay.classList.remove("goal-blue", "goal-red");
+        overlay.classList.add(
+            "show",
+            "goal-mode",
+            "match-mode",
+            "champion-mode",
+            "goal-ready",
+            isBlue ? "goal-blue" : "goal-red"
+        );
+
+        if(championImage) {
+            championImage.src = isBlue
+                ? "imagens/geral/img-champion-blue.png"
+                : "imagens/geral/img-champion-red.png";
+            championImage.alt = `Imagem do ${name}, vencedor por abandono`;
+        }
+
+        if(goalIdentity) {
+            goalIdentity.setAttribute("aria-hidden", "true");
+        }
+
+        title.textContent = `${emoji} 🏆 ${name} VENCEU!`;
+        text.textContent = matchEndDetail || (
+            matchEndReason === "interruptions"
+                ? `${name} venceu porque o adversário ultrapassou o limite de interrupções.`
+                : `${name} venceu porque o adversário não se reconectou em 30 segundos.`
+        );
+
+        button.textContent = "NOVA PARTIDA • 0 × 0";
+        launchChampionConfetti(scoringPlayer);
+        return;
     }
 
     // Vitória por tempo ou desempate por peças:

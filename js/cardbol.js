@@ -495,6 +495,61 @@ function isCpuTurn() { return isCpuMode() && currentPlayer === CPU_PLAYER; }
 
 let cpuCardUsedThisTurn = false;
 
+// ------------------------------------------------------------
+// CPU — ADMINISTRAR RESULTADO / FAZER CERA
+// 2º tempo + vencendo + últimos 3min = 80% dos turnos elegíveis.
+// ------------------------------------------------------------
+const CPU_MANAGE_RESULT_CHANCE = 0.80;
+const CPU_MANAGE_RESULT_WINDOW_MS = 3 * 60 * 1000;
+const CPU_MANAGE_RESULT_DELAYS_MS = [10_000, 20_000, 30_000];
+
+let cpuManageResultDecisionMade = false;
+let cpuManageResultThisTurn = false;
+let cpuManageResultDelayApplied = false;
+let cpuManageResultDelayMs = 0;
+
+function cpuIsWinningOnScore() {
+    return scoreBlue > scoreRed;
+}
+
+function cpuCanManageResultNow() {
+    return (
+        isCpuTurn() &&
+        matchClockRunning &&
+        matchPeriod === 2 &&
+        matchTimeRemainingMs > 0 &&
+        matchTimeRemainingMs <= CPU_MANAGE_RESULT_WINDOW_MS &&
+        cpuIsWinningOnScore() &&
+        winner === null &&
+        !goalPause
+    );
+}
+
+function cpuResetManageResultTurnState() {
+    cpuManageResultDecisionMade = false;
+    cpuManageResultThisTurn = false;
+    cpuManageResultDelayApplied = false;
+    cpuManageResultDelayMs = 0;
+}
+
+function cpuPrepareManageResultForTurn() {
+    if(cpuManageResultDecisionMade) return cpuManageResultThisTurn;
+
+    cpuManageResultDecisionMade = true;
+    cpuManageResultThisTurn = (
+        cpuCanManageResultNow() &&
+        Math.random() < CPU_MANAGE_RESULT_CHANCE
+    );
+
+    if(cpuManageResultThisTurn) {
+        cpuManageResultDelayMs = CPU_MANAGE_RESULT_DELAYS_MS[
+            Math.floor(Math.random() * CPU_MANAGE_RESULT_DELAYS_MS.length)
+        ];
+    }
+
+    return cpuManageResultThisTurn;
+}
+
 // Usado para dar ao ATK um comportamento mais agressivo nas primeiras jogadas.
 let cpuTurnsCompleted = 0;
 
@@ -503,6 +558,7 @@ function clearCpuTimers() {
     if(cpuFormationTimer) { clearTimeout(cpuFormationTimer); cpuFormationTimer = null; }
     cpuThinking = false;
     cpuCardUsedThisTurn = false;
+    cpuResetManageResultTurnState();
 }
 
 function showGameModeOverlay() {
@@ -1801,6 +1857,53 @@ function cpuAdvancedThreatShapeScore() {
     return score;
 }
 
+function cpuManageResultMoveBonus(
+    piece,
+    target,
+    beforeCoverage,
+    afterCoverage,
+    beforeDanger,
+    afterDanger
+) {
+    if(!cpuManageResultThisTurn) return 0;
+
+    let bonus = 0;
+    const retreat = target.row - piece.row; // CPU defende o lado da row 17.
+    const centerDistance = Math.min(
+        ...goalColumns.map(goalCol => Math.abs(target.col - goalCol))
+    );
+
+    const defensiveRole = ["ZG","LE","LD"].includes(piece.role);
+    const midfieldRole = ["ME","MD"].includes(piece.role);
+
+    // Recuar em direção ao próprio gol passa a valer muito mais.
+    if(retreat > 0) {
+        if(defensiveRole) bonus += retreat * 24;
+        else if(midfieldRole) bonus += retreat * 18;
+        else if(piece.role === "ATK") bonus += retreat * 6;
+    } else if(retreat < 0) {
+        if(defensiveRole) bonus -= Math.abs(retreat) * 30;
+        else if(midfieldRole) bonus -= Math.abs(retreat) * 22;
+        else if(piece.role === "ATK") bonus -= Math.abs(retreat) * 5;
+    }
+
+    // Forma uma linha de proteção nas proximidades do gol.
+    if(defensiveRole || midfieldRole) {
+        if(target.row >= 12) bonus += 28;
+        if(target.row >= 14) bonus += 34;
+        if(target.row >= 15) bonus += 22;
+
+        // Prioriza os três corredores centrais de entrada do gol.
+        bonus += Math.max(0, 3 - centerDistance) * 22;
+    }
+
+    // O ganho real de cobertura/diminuição de perigo ganha peso extra.
+    bonus += (afterCoverage - beforeCoverage) * 5.2;
+    bonus += (beforeDanger - afterDanger) * 2.1;
+
+    return bonus;
+}
+
 function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
     if(cpuIsGoalTarget(piece.player,target)) {
         return 100000 + Math.random() * 50;
@@ -1814,6 +1917,7 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
 
     const beforeThreatWays = cpuHumanGoalThreatWays();
     const beforeDanger = cpuHumanDangerScore();
+    const beforeCoverage = cpuDefensiveCoverageScore();
     const beforePositionQuality = cpuPositionQualityScore(piece);
     const beforeAttackShape = cpuAdvancedThreatShapeScore();
 
@@ -1822,6 +1926,7 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
             board: cpuBoardStateScore(),
             threatWays: cpuHumanGoalThreatWays(),
             danger: cpuHumanDangerScore(),
+            coverage: cpuDefensiveCoverageScore(),
             positionQuality: cpuPositionQualityScore(piece),
             midfieldSupport: cpuMidfieldSupportScore(piece),
             attackShape: cpuAdvancedThreatShapeScore()
@@ -1849,6 +1954,15 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
     }
 
     score += (beforeDanger - simulation.danger) * 1.25;
+
+    score += cpuManageResultMoveBonus(
+        piece,
+        target,
+        beforeCoverage,
+        simulation.coverage,
+        beforeDanger,
+        simulation.danger
+    );
 
     const centerDistance = Math.abs(target.col - 5);
 
@@ -2252,6 +2366,12 @@ function cpuBestBlockPlan() {
         score += Math.max(0, cell.row - 10) * 2;
         score += Math.max(0, 4 - Math.abs(cell.col - 5)) * 4;
 
+        if(cpuManageResultThisTurn) {
+            // Nos minutos finais, tenta fechar os corredores próximos do próprio gol.
+            score += Math.max(0, cell.row - 10) * 12;
+            score += Math.max(0, 4 - Math.abs(cell.col - 5)) * 14;
+        }
+
         if(!best || score > best.score) {
             best = { cell, score };
         }
@@ -2416,6 +2536,8 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
                 Math.max(0,plan.score) * 0.3 +
                 threatWays * 70 +
                 danger * 0.12;
+
+            if(cpuManageResultThisTurn) priority += 180;
         }
     }
 
@@ -2427,6 +2549,8 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
                 22 +
                 Math.max(0,plan.score) * 0.25 +
                 threatWays * 35;
+
+            if(cpuManageResultThisTurn) priority += 95;
         }
     }
 
@@ -2443,6 +2567,8 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
 
             // Nem sempre gasta CATIMBA cedo sem pressão.
             if(threatWays === 0 && danger < 75) priority -= 14;
+
+            if(cpuManageResultThisTurn) priority += 160;
         }
     }
 
@@ -2795,13 +2921,15 @@ function cpuChooseAndMove() {
         cpuFutureGoalProfileForPiece(piece)
     );
 
-    let tacticalLabel = "melhorando a posição";
+    let tacticalLabel = cpuManageResultThisTurn
+        ? "administrando a vantagem e fechando espaços"
+        : "melhorando a posição";
 
-    if(cpuIsDiagonalStep(piece,target) && piece.role === "ATK") {
+    if(!cpuManageResultThisTurn && cpuIsDiagonalStep(piece,target) && piece.role === "ATK") {
         tacticalLabel = "abrindo diagonal de ataque";
-    } else if(["ME","MD"].includes(piece.role) && target.row < piece.row) {
+    } else if(!cpuManageResultThisTurn && ["ME","MD"].includes(piece.role) && target.row < piece.row) {
         tacticalLabel = "levando o meio-campo para apoiar o ataque";
-    } else if(futureProfile.ways > 0) {
+    } else if(!cpuManageResultThisTurn && futureProfile.ways > 0) {
         tacticalLabel = `criando ameaça de gol para ${futureProfile.ways} resultado${futureProfile.ways > 1 ? "s" : ""} do dado`;
     } else if(cpuHumanGoalThreatWays() > 0 || cpuHumanDangerScore() > 115) {
         tacticalLabel = "reorganizando a defesa sem abandonar o ataque";
@@ -2918,10 +3046,24 @@ function scheduleCpuIfNeeded(delay=850) {
 
     if(cpuActionTimer) clearTimeout(cpuActionTimer);
 
+    cpuPrepareManageResultForTurn();
+
+    let scheduledDelay = delay;
+
+    if(cpuManageResultThisTurn && !cpuManageResultDelayApplied) {
+        cpuManageResultDelayApplied = true;
+        scheduledDelay = cpuManageResultDelayMs;
+
+        const seconds = Math.round(cpuManageResultDelayMs / 1000);
+        setMessage(
+            `🤖 CPU está administrando a vantagem... pensando a jogada (${seconds}s).`
+        );
+    }
+
     cpuThinking = true;
     render();
 
-    cpuActionTimer = setTimeout(runCpuTurn,delay);
+    cpuActionTimer = setTimeout(runCpuTurn,scheduledDelay);
 }
 
 // ============================================================
@@ -3201,6 +3343,7 @@ function completeFormationSetup() {
 
         currentPlayer = getPeriodKickoffPlayer(2);
         cpuCardUsedThisTurn = false;
+        cpuResetManageResultTurnState();
 
         setMessage(
             `▶ 2º TEMPO! Formações ajustadas. ${playerName(currentPlayer)} dará a saída.`,
@@ -8091,6 +8234,7 @@ function passTurn(reason = "normal") {
     }
 
     cpuCardUsedThisTurn = false;
+    cpuResetManageResultTurnState();
 
     currentPlayer =
         currentPlayer === 0
@@ -8413,6 +8557,7 @@ function continueAfterGoal() {
 
     // A saída após um gol é um novo turno para fins da inteligência da CPU.
     cpuCardUsedThisTurn = false;
+    cpuResetManageResultTurnState();
     goalPause = false;
     resetTurnClock();
 
@@ -8960,6 +9105,7 @@ function newGame() {
     card10CatimbaAudio.currentTime = 0;
     clearCpuTimers();
     cpuTurnsCompleted = 0;
+    cpuResetManageResultTurnState();
 
     if(card7LingeringFireTimer) {
         clearTimeout(card7LingeringFireTimer);
@@ -9197,6 +9343,7 @@ function spinKickoffRoulette() {
         kickoffDrawPending = false;
 
         currentPlayer = sector.player;
+        cpuResetManageResultTurnState();
         initialKickoffPlayer = sector.player;
         matchPeriod = 1;
         extraPeriodNumber = 0;

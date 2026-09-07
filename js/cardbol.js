@@ -838,6 +838,26 @@ function openRankingOverlay() {
     overlay.setAttribute("aria-hidden", "false");
 
     loadRankingData();
+
+    // A tela de ranking permanece aberta por no máximo 10 segundos.
+    // No modo online o relógio da partida continua correndo para impedir
+    // que a consulta ao ranking seja usada para fazer cera.
+    {
+        if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
+        if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
+
+        const deadline = Date.now() + ONLINE_RANKING_LIMIT_MS;
+        const tick = () => {
+            if(!rankingOverlayOpen) return;
+            const remaining = deadline - Date.now();
+            showOnlinePhaseTimer("🏆 RANKING", remaining);
+            if(remaining <= 0) closeRankingOverlay();
+        };
+
+        tick();
+        onlineRankingCountdownTimer = setInterval(tick, 250);
+        onlineRankingAutoCloseTimer = setTimeout(closeRankingOverlay, ONLINE_RANKING_LIMIT_MS + 50);
+    }
 }
 
 function closeRankingOverlay() {
@@ -846,6 +866,12 @@ function closeRankingOverlay() {
 
     rankingOverlayOpen = false;
     rankingRequestSequence += 1;
+
+    if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
+    if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
+    onlineRankingAutoCloseTimer = null;
+    onlineRankingCountdownTimer = null;
+    hideOnlinePhaseTimer();
 
     overlay.classList.remove("show");
     overlay.setAttribute("aria-hidden", "true");
@@ -1239,6 +1265,576 @@ let onlineLobbyState = {
     gameplayLocked: true
 };
 
+// ============================================================
+// ONLINE FASE 3 — SINCRONIZAÇÃO DA PARTIDA + LIMITES DE TEMPO
+// ============================================================
+const ONLINE_FORMATION_LIMIT_MS = 30 * 1000;
+const ONLINE_GOAL_BREAK_MS = 10 * 1000;
+const ONLINE_RANKING_LIMIT_MS = 10 * 1000;
+const ONLINE_RECONNECT_LIMIT_MS = 30 * 1000;
+const ONLINE_MAX_INTERRUPTS = 5;
+const ONLINE_GAME_POLL_MS = 650;
+
+let onlineFormationDeadlineAt = null;
+let onlineFormationTimer = null;
+let onlineGoalResumeAt = null;
+let onlineGoalTimer = null;
+let onlineGamePollingTimer = null;
+let onlineStatePublishTimer = null;
+let onlineStatePublishBusy = false;
+let onlinePendingStatePublish = null;
+let onlineApplyingRemoteState = false;
+let onlineGameRevision = 0;
+let onlineServerActivePlayer = null;
+let onlineLastPublishedSignature = "";
+let onlineLastAppliedRevision = 0;
+let onlineLocalConnectionLostAt = null;
+let onlineReconnectUiTimer = null;
+let onlineOpponentDisconnectedSince = null;
+let onlineLocalInterruptions = 0;
+let onlineOpponentInterruptions = 0;
+let onlineGameFinishedByPresence = false;
+let onlineRankingAutoCloseTimer = null;
+let onlineRankingCountdownTimer = null;
+
+function clearOnlinePhaseTimers() {
+    if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+    if(onlineGoalTimer) clearInterval(onlineGoalTimer);
+    if(onlineGamePollingTimer) clearInterval(onlineGamePollingTimer);
+    if(onlineStatePublishTimer) clearTimeout(onlineStatePublishTimer);
+    if(onlineReconnectUiTimer) clearInterval(onlineReconnectUiTimer);
+    if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
+    if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
+
+    onlineFormationTimer = null;
+    onlineGoalTimer = null;
+    onlineGamePollingTimer = null;
+    onlineStatePublishTimer = null;
+    onlineReconnectUiTimer = null;
+    onlineRankingAutoCloseTimer = null;
+    onlineRankingCountdownTimer = null;
+}
+
+function resetOnlineGameplaySyncState() {
+    clearOnlinePhaseTimers();
+    onlineFormationDeadlineAt = null;
+    onlineGoalResumeAt = null;
+    onlineStatePublishBusy = false;
+    onlinePendingStatePublish = null;
+    onlineApplyingRemoteState = false;
+    onlineGameRevision = 0;
+    onlineServerActivePlayer = null;
+    onlineLastPublishedSignature = "";
+    onlineLastAppliedRevision = 0;
+    onlineLocalConnectionLostAt = null;
+    onlineOpponentDisconnectedSince = null;
+    onlineLocalInterruptions = 0;
+    onlineOpponentInterruptions = 0;
+    onlineGameFinishedByPresence = false;
+    hideOnlinePhaseTimer();
+    hideOnlineReconnectOverlay();
+}
+
+function showOnlinePhaseTimer(label, remainingMs) {
+    const badge = document.getElementById("onlinePhaseTimerBadge");
+    if(!badge) return;
+    const seconds = Math.max(0, Math.ceil(Number(remainingMs || 0) / 1000));
+    badge.textContent = `${label} • ${seconds}s`;
+    badge.classList.add("show");
+}
+
+function hideOnlinePhaseTimer() {
+    const badge = document.getElementById("onlinePhaseTimerBadge");
+    if(!badge) return;
+    badge.classList.remove("show");
+    badge.textContent = "";
+}
+
+function startOnlineFormationCountdown() {
+    if(!isOnlineMode()) return;
+    if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+
+    onlineFormationDeadlineAt = Date.now() + ONLINE_FORMATION_LIMIT_MS;
+
+    const tick = () => {
+        if(!formationSetupActive || isOnlineLocalFormationConfirmed()) {
+            if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+            onlineFormationTimer = null;
+            hideOnlinePhaseTimer();
+            return;
+        }
+
+        const remaining = onlineFormationDeadlineAt - Date.now();
+        showOnlinePhaseTimer("⚙️ FORMAÇÃO", remaining);
+
+        if(remaining <= 0) {
+            if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+            onlineFormationTimer = null;
+            hideOnlinePhaseTimer();
+            setMessage("⏱ 30s encerrados. Formação atual enviada automaticamente.", 0);
+            confirmOnlineFormation();
+        }
+    };
+
+    tick();
+    onlineFormationTimer = setInterval(tick, 250);
+}
+
+function startOnlineGoalCountdown() {
+    if(!isOnlineMode() || !goalPause || winner !== null) return;
+    if(onlineGoalTimer) clearInterval(onlineGoalTimer);
+    if(!onlineGoalResumeAt) onlineGoalResumeAt = Date.now() + ONLINE_GOAL_BREAK_MS;
+
+    const tick = () => {
+        if(!goalPause || winner !== null || !onlineGoalResumeAt) {
+            if(onlineGoalTimer) clearInterval(onlineGoalTimer);
+            onlineGoalTimer = null;
+            hideOnlinePhaseTimer();
+            return;
+        }
+
+        const remaining = onlineGoalResumeAt - Date.now();
+        showOnlinePhaseTimer("⚽ REINÍCIO", remaining);
+
+        const button = document.getElementById("victoryButton");
+        if(button) {
+            button.disabled = true;
+            button.textContent = `REINÍCIO EM ${Math.max(0, Math.ceil(remaining/1000))}s`;
+        }
+
+        if(remaining <= 0) {
+            // Se houver uma queda ativa, o reinício fica congelado em 0s
+            // até a reconexão, preservando o estado compartilhado.
+            if(onlineLocalConnectionLostAt || onlineOpponentDisconnectedSince) {
+                showOnlinePhaseTimer("⚽ REINÍCIO", 0);
+                return;
+            }
+
+            if(onlineGoalTimer) clearInterval(onlineGoalTimer);
+            onlineGoalTimer = null;
+            hideOnlinePhaseTimer();
+
+            // Apenas o jogador que sofreu o gol (e dará a saída) efetiva
+            // a retomada, evitando duas gravações concorrentes.
+            if(getOnlineLocalPlayerIndex() === currentPlayer) {
+                onlineGoalResumeAt = null;
+                continueAfterGoal();
+                scheduleOnlineStatePublish(true);
+            }
+        }
+    };
+
+    tick();
+    onlineGoalTimer = setInterval(tick, 250);
+}
+
+function showOnlineReconnectOverlay({ local = false, since = null, interruptions = 0 } = {}) {
+    const overlay = document.getElementById("onlineReconnectOverlay");
+    const title = document.getElementById("onlineReconnectTitle");
+    const text = document.getElementById("onlineReconnectText");
+    const count = document.getElementById("onlineReconnectCountdown");
+    const interruptionsEl = document.getElementById("onlineReconnectInterruptions");
+    if(!overlay) return;
+
+    const startedAt = since ? new Date(since).getTime() : Date.now();
+    const remaining = Math.max(0, ONLINE_RECONNECT_LIMIT_MS - (Date.now() - startedAt));
+
+    if(title) title.textContent = local ? "RECONECTANDO..." : "ADVERSÁRIO DESCONECTOU";
+    if(text) text.textContent = local
+        ? "Sua conexão com a partida foi interrompida. Tentando reconectar automaticamente."
+        : "A partida está pausada enquanto aguardamos o adversário voltar.";
+    if(count) count.textContent = `${Math.ceil(remaining / 1000)}s`;
+    if(interruptionsEl) interruptionsEl.textContent = `Interrupções: ${interruptions}/${ONLINE_MAX_INTERRUPTS}`;
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function hideOnlineReconnectOverlay() {
+    const overlay = document.getElementById("onlineReconnectOverlay");
+    if(!overlay) return;
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+function onlineInteractionAllowed(showMessage = true) {
+    if(!isOnlineMode()) return true;
+
+    if(onlineGameFinishedByPresence || winner !== null) return false;
+
+    if(onlineLocalConnectionLostAt || onlineOpponentDisconnectedSince) {
+        if(showMessage) setMessage("📡 Partida pausada aguardando reconexão.", 0);
+        return false;
+    }
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    if(currentPlayer !== localPlayer) {
+        if(showMessage) {
+            const opponentName = localPlayer === 1
+                ? (onlineLobbyState.guestUsername || playerName(0))
+                : (onlineLobbyState.hostUsername || playerName(1));
+            setMessage(`🌐 Aguarde a jogada de ${opponentName}.`, 0);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+function serializeOnlineGameState() {
+    return {
+        version: 1,
+        currentPlayer,
+        scoreBlue,
+        scoreRed,
+        diceValue,
+        diceRolled,
+        pieces: pieces.map(piece => ({...piece})),
+        hands: hands.map(hand => [...hand]),
+        catimbaPending: [...catimbaPending],
+        reserveAvailable: reserveAvailable.map(set => [...set]),
+        reserveInPlay: reserveInPlay.map(items => items.map(item => ({...item}))),
+        expelledPlayers: expelledPlayers.map(map => [...map.entries()].map(([id, value]) => [id, {...value}])),
+        blocks: blocks.map(block => ({...block})),
+        nextBlockId,
+        matchPeriod,
+        extraPeriodNumber,
+        matchTimeRemainingMs,
+        turnTimeRemainingMs,
+        matchClockRunning,
+        periodBreakActive,
+        periodBreakType,
+        initialKickoffPlayer,
+        winner,
+        matchEndReason,
+        matchEndDetail,
+        goalPause,
+        lastGoalScorer: lastGoalScorer ? {...lastGoalScorer} : null,
+        startingFormation,
+        goalResumeAt: onlineGoalResumeAt
+    };
+}
+
+function onlineStateSignature(state) {
+    try { return JSON.stringify(state); }
+    catch(error) { return ""; }
+}
+
+function restoreOnlineGameState(state) {
+    if(!state || typeof state !== "object") return;
+
+    const oldScoreRed = scoreRed;
+    const oldScoreBlue = scoreBlue;
+    const oldGoalPause = goalPause;
+    const oldWinner = winner;
+    const oldCurrentPlayer = currentPlayer;
+
+    onlineApplyingRemoteState = true;
+
+    try {
+        currentPlayer = Number(state.currentPlayer) === 1 ? 1 : 0;
+        scoreBlue = Math.max(0, Number(state.scoreBlue) || 0);
+        scoreRed = Math.max(0, Number(state.scoreRed) || 0);
+        diceValue = state.diceValue === null ? null : Number(state.diceValue);
+        diceRolled = state.diceRolled === true;
+
+        if(Array.isArray(state.pieces)) {
+            pieces = state.pieces.map(piece => ({...piece}));
+        }
+
+        if(Array.isArray(state.hands) && state.hands.length === 2) {
+            hands = state.hands.map(hand => Array.isArray(hand) ? [...hand] : []);
+        }
+
+        if(Array.isArray(state.catimbaPending) && state.catimbaPending.length === 2) {
+            catimbaPending = state.catimbaPending.map(Boolean);
+        }
+
+        if(Array.isArray(state.reserveAvailable) && state.reserveAvailable.length === 2) {
+            reserveAvailable = state.reserveAvailable.map(items => new Set(Array.isArray(items) ? items : []));
+        }
+
+        if(Array.isArray(state.reserveInPlay) && state.reserveInPlay.length === 2) {
+            reserveInPlay = state.reserveInPlay.map(items => Array.isArray(items) ? items.map(item => ({...item})) : []);
+        }
+
+        if(Array.isArray(state.expelledPlayers) && state.expelledPlayers.length === 2) {
+            expelledPlayers = state.expelledPlayers.map(entries => {
+                const map = new Map();
+                (Array.isArray(entries) ? entries : []).forEach(([id, value]) => {
+                    map.set(Number.isNaN(Number(id)) ? id : Number(id), {...value});
+                });
+                return map;
+            });
+        }
+
+        if(Array.isArray(state.blocks)) blocks = state.blocks.map(block => ({...block}));
+        nextBlockId = Math.max(1, Number(state.nextBlockId) || 1);
+
+        matchPeriod = Math.max(1, Number(state.matchPeriod) || 1);
+        extraPeriodNumber = Math.max(0, Number(state.extraPeriodNumber) || 0);
+        matchTimeRemainingMs = Math.max(0, Number(state.matchTimeRemainingMs) || 0);
+        turnTimeRemainingMs = Math.max(0, Number(state.turnTimeRemainingMs) || 0);
+        matchClockRunning = state.matchClockRunning === true;
+        periodBreakActive = state.periodBreakActive === true;
+        periodBreakType = state.periodBreakType || null;
+        initialKickoffPlayer = (Number(state.initialKickoffPlayer) === 0 || Number(state.initialKickoffPlayer) === 1)
+            ? Number(state.initialKickoffPlayer)
+            : initialKickoffPlayer;
+        winner = (Number(state.winner) === 0 || Number(state.winner) === 1) ? Number(state.winner) : null;
+        matchEndReason = state.matchEndReason || null;
+        matchEndDetail = state.matchEndDetail || "";
+        goalPause = state.goalPause === true;
+        lastGoalScorer = state.lastGoalScorer ? {...state.lastGoalScorer} : null;
+        if(Array.isArray(state.startingFormation)) startingFormation = state.startingFormation;
+        onlineGoalResumeAt = state.goalResumeAt ? Number(state.goalResumeAt) : null;
+
+        selectedPiece = null;
+        formationSelectedPiece = null;
+        cardTargetMode = null;
+        lastClockTickAt = Date.now();
+
+        resetDiceDisplay();
+        if(diceRolled && Number.isFinite(diceValue)) {
+            showDiceValue(diceValue);
+            const movementLabel = document.getElementById("diceValueTop");
+            if(movementLabel) movementLabel.textContent = diceValue;
+        }
+
+        updateScoreboard();
+        render();
+
+        const scoredRed = scoreRed > oldScoreRed;
+        const scoredBlue = scoreBlue > oldScoreBlue;
+
+        if(!oldGoalPause && goalPause && winner === null && (scoredRed || scoredBlue)) {
+            const scoringPlayer = scoredRed ? 1 : 0;
+            showVictory(false, scoringPlayer);
+            startOnlineGoalCountdown();
+        }
+
+        if(oldGoalPause && !goalPause) {
+            clearGoalCelebrationVisuals(true);
+            hideOnlinePhaseTimer();
+        }
+
+        if(oldWinner === null && winner !== null) {
+            showVictory(true, winner);
+        }
+
+        if(oldCurrentPlayer !== currentPlayer) {
+            selectedPiece = null;
+            cardTargetMode = null;
+        }
+
+        if(!goalPause && winner === null && !periodBreakActive) {
+            const localPlayer = getOnlineLocalPlayerIndex();
+            if(currentPlayer === localPlayer) {
+                setMessage(
+                    diceRolled
+                        ? `🌐 SUA VEZ • movimento ${diceValue}. Escolha sua peça.`
+                        : `🌐 SUA VEZ • ${playerName(currentPlayer)}: jogue o dado.`,
+                    0
+                );
+            } else {
+                const opponent = localPlayer === 1
+                    ? (onlineLobbyState.guestUsername || playerName(0))
+                    : (onlineLobbyState.hostUsername || playerName(1));
+                setMessage(
+                    diceRolled
+                        ? `🌐 ${opponent} tirou ${diceValue} e está escolhendo a jogada...`
+                        : `🌐 Aguarde a vez de ${opponent}.`,
+                    0
+                );
+            }
+        }
+    } finally {
+        onlineApplyingRemoteState = false;
+    }
+}
+
+async function publishOnlineStateNow(state, signature) {
+    if(!isOnlineMode() || !onlineLobbyState.roomCode || onlineApplyingRemoteState) return;
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    if(onlineServerActivePlayer !== localPlayer) return;
+
+    onlineStatePublishBusy = true;
+
+    try {
+        const result = await onlineRpc("cardbol_online_publish_state", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_state: state
+        });
+
+        if(!result || result.success !== true) {
+            throw new Error(`Falha ao sincronizar jogada (${result?.status || "UNKNOWN"}).`);
+        }
+
+        onlineGameRevision = Number(result.game_revision) || onlineGameRevision;
+        onlineLastAppliedRevision = onlineGameRevision;
+        onlineServerActivePlayer = Number(result.active_player);
+        onlineLastPublishedSignature = signature;
+        onlineLocalConnectionLostAt = null;
+
+    } catch(error) {
+        console.warn("CardBol online publish:", error);
+        if(!onlineLocalConnectionLostAt) onlineLocalConnectionLostAt = Date.now();
+        showOnlineReconnectOverlay({
+            local: true,
+            since: onlineLocalConnectionLostAt,
+            interruptions: onlineLocalInterruptions
+        });
+    } finally {
+        onlineStatePublishBusy = false;
+
+        if(onlinePendingStatePublish) {
+            const pending = onlinePendingStatePublish;
+            onlinePendingStatePublish = null;
+            publishOnlineStateNow(pending.state, pending.signature);
+        }
+    }
+}
+
+function scheduleOnlineStatePublish(force = false) {
+    if(
+        !isOnlineMode() ||
+        onlineApplyingRemoteState ||
+        onlineLobbyState.roomStatus !== "playing" ||
+        onlineGameFinishedByPresence
+    ) return;
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    if(onlineServerActivePlayer !== localPlayer) return;
+
+    const state = serializeOnlineGameState();
+    const signature = onlineStateSignature(state);
+
+    if(!force && signature && signature === onlineLastPublishedSignature) return;
+
+    onlinePendingStatePublish = {state, signature};
+
+    if(onlineStatePublishBusy) return;
+
+    if(onlineStatePublishTimer) clearTimeout(onlineStatePublishTimer);
+    onlineStatePublishTimer = setTimeout(() => {
+        onlineStatePublishTimer = null;
+        const pending = onlinePendingStatePublish;
+        onlinePendingStatePublish = null;
+        if(pending) publishOnlineStateNow(pending.state, pending.signature);
+    }, force ? 0 : 120);
+}
+
+function handleOnlinePresenceResult(result) {
+    if(!result || result.success !== true) return;
+
+    onlineLobbyState.roomStatus = result.room_status || onlineLobbyState.roomStatus;
+    const localIsHost = onlineLobbyState.callerSide === "host";
+
+    onlineLocalInterruptions = Number(localIsHost ? result.host_interruptions : result.guest_interruptions) || 0;
+    onlineOpponentInterruptions = Number(localIsHost ? result.guest_interruptions : result.host_interruptions) || 0;
+    onlineOpponentDisconnectedSince = localIsHost
+        ? (result.guest_disconnected_since || null)
+        : (result.host_disconnected_since || null);
+
+    if(onlineOpponentDisconnectedSince && !onlineGameFinishedByPresence) {
+        showOnlineReconnectOverlay({
+            local: false,
+            since: onlineOpponentDisconnectedSince,
+            interruptions: onlineOpponentInterruptions
+        });
+    } else if(!onlineLocalConnectionLostAt) {
+        hideOnlineReconnectOverlay();
+    }
+
+    const winnerValue = Number(result.winner_player);
+    const presenceForfeit = result.finish_reason === "interruptions" || result.finish_reason === "reconnect_timeout";
+
+    if(
+        result.room_status === "finished" &&
+        presenceForfeit &&
+        (winnerValue === 0 || winnerValue === 1) &&
+        winner === null
+    ) {
+        onlineGameFinishedByPresence = true;
+        winner = winnerValue;
+        matchEndReason = result.finish_reason || "disconnect";
+        matchEndDetail = result.finish_reason === "interruptions"
+            ? `Fim de jogo: o adversário ultrapassou o limite de ${ONLINE_MAX_INTERRUPTS} interrupções.`
+            : "Fim de jogo: o adversário não conseguiu se reconectar dentro de 30 segundos.";
+        matchClockRunning = false;
+        goalPause = true;
+        hideOnlineReconnectOverlay();
+        hideOnlinePhaseTimer();
+        render();
+        showVictory(true, winner);
+    }
+}
+
+async function pollOnlineGameState() {
+    if(!isOnlineMode() || !onlineLobbyState.roomCode) return;
+
+    try {
+        const result = await onlineRpc("cardbol_online_get_game_state", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+
+        if(!result || result.success !== true) {
+            throw new Error(`Sala online indisponível (${result?.status || "UNKNOWN"}).`);
+        }
+
+        onlineLocalConnectionLostAt = null;
+        hideOnlineReconnectOverlay();
+        handleOnlinePresenceResult(result);
+
+        const revision = Number(result.game_revision) || 0;
+        onlineGameRevision = Math.max(onlineGameRevision, revision);
+        onlineServerActivePlayer = (Number(result.active_player) === 0 || Number(result.active_player) === 1)
+            ? Number(result.active_player)
+            : onlineServerActivePlayer;
+
+        if(result.game_state && revision > onlineLastAppliedRevision) {
+            onlineLastAppliedRevision = revision;
+            const signature = onlineStateSignature(result.game_state);
+            onlineLastPublishedSignature = signature;
+            restoreOnlineGameState(result.game_state);
+        }
+
+    } catch(error) {
+        console.warn("CardBol online poll:", error);
+        if(!onlineLocalConnectionLostAt) onlineLocalConnectionLostAt = Date.now();
+
+        showOnlineReconnectOverlay({
+            local: true,
+            since: onlineLocalConnectionLostAt,
+            interruptions: onlineLocalInterruptions
+        });
+    }
+}
+
+function startOnlineGamePolling() {
+    if(onlineGamePollingTimer) clearInterval(onlineGamePollingTimer);
+    pollOnlineGameState();
+    onlineGamePollingTimer = setInterval(pollOnlineGameState, ONLINE_GAME_POLL_MS);
+}
+
+async function pollOnlinePresenceDuringSetup() {
+    if(!isOnlineMode() || !onlineLobbyState.roomCode) return;
+    try {
+        const result = await onlineRpc("cardbol_online_presence", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+        onlineLocalConnectionLostAt = null;
+        handleOnlinePresenceResult(result);
+    } catch(error) {
+        if(!onlineLocalConnectionLostAt) onlineLocalConnectionLostAt = Date.now();
+        showOnlineReconnectOverlay({ local:true, since:onlineLocalConnectionLostAt, interruptions:onlineLocalInterruptions });
+    }
+}
+
 function clearOnlineLobbyTimers() {
     if(onlineLobbyState.pollingTimer) {
         clearInterval(onlineLobbyState.pollingTimer);
@@ -1253,6 +1849,7 @@ function clearOnlineLobbyTimers() {
 
 function resetOnlineLobbyState() {
     clearOnlineLobbyTimers();
+    resetOnlineGameplaySyncState();
 
     onlineLobbyState = {
         roomId: null,
@@ -1468,7 +2065,10 @@ function startOnlineSetupPolling() {
 
     onlineLobbyState.setupPollingTimer = setInterval(() => {
         refreshOnlineSetup();
+        pollOnlinePresenceDuringSetup();
     }, ONLINE_SETUP_POLL_MS);
+
+    pollOnlinePresenceDuringSetup();
 }
 
 function serializeFormationForPlayer(player) {
@@ -1549,6 +2149,12 @@ function applyOnlineSetupData(result) {
     const opponentConfirmed = localPlayer === 1
         ? onlineLobbyState.guestFormationConfirmed
         : onlineLobbyState.hostFormationConfirmed;
+
+    if(localConfirmed) {
+        if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+        onlineFormationTimer = null;
+        hideOnlinePhaseTimer();
+    }
 
     if(formationSetupActive && isOnlineMode()) {
         if(localConfirmed && !opponentConfirmed) {
@@ -1635,6 +2241,7 @@ function beginOnlineFormationStage() {
         render();
         startOnlineSetupPolling();
         refreshOnlineSetup();
+        startOnlineFormationCountdown();
     }
 }
 
@@ -1702,6 +2309,12 @@ function prepareOnlineKickoffFromServer() {
 
     onlineLobbyState.kickoffShown = true;
 
+    if(onlineFormationTimer) {
+        clearInterval(onlineFormationTimer);
+        onlineFormationTimer = null;
+    }
+    hideOnlinePhaseTimer();
+
     if(onlineLobbyState.setupPollingTimer) {
         clearInterval(onlineLobbyState.setupPollingTimer);
         onlineLobbyState.setupPollingTimer = null;
@@ -1740,13 +2353,38 @@ async function markOnlineRoomPlaying() {
     if(!isOnlineMode() || !onlineLobbyState.roomCode) return;
 
     try {
-        await onlineRpc("cardbol_online_mark_playing", {
+        const result = await onlineRpc("cardbol_online_mark_playing", {
             ...getOnlineSessionPayload(),
             p_room_code: onlineLobbyState.roomCode
         });
+
+        if(!result || result.success !== true) {
+            throw new Error(`Não foi possível iniciar a partida (${result?.status || "UNKNOWN"}).`);
+        }
+
         onlineLobbyState.roomStatus = "playing";
+        onlineLobbyState.gameplayLocked = false;
+        onlineServerActivePlayer = currentPlayer;
+        matchClockRunning = true;
+        lastClockTickAt = Date.now();
+
+        startOnlineGamePolling();
+
+        if(getOnlineLocalPlayerIndex() === currentPlayer) {
+            setMessage(`🌐 SUA VEZ — ${playerName(currentPlayer)}: jogue o dado!`, 0);
+            scheduleOnlineStatePublish(true);
+        } else {
+            const opponent = getOnlineLocalPlayerIndex() === 1
+                ? (onlineLobbyState.guestUsername || playerName(0))
+                : (onlineLobbyState.hostUsername || playerName(1));
+            setMessage(`🌐 Partida iniciada. Aguarde a jogada de ${opponent}.`, 0);
+        }
+
+        render();
     } catch(error) {
         console.warn("CardBol online playing:", error);
+        onlineLobbyState.gameplayLocked = true;
+        setMessage(`⚠ Não foi possível iniciar a partida online: ${String(error?.message || "erro de sincronização")}`, 0);
     }
 }
 
@@ -5842,6 +6480,8 @@ function createGoalHandlers() {
 
 function handleGoalClick(row, col, attackingPlayer) {
 
+    if(isOnlineMode() && !formationSetupActive && !onlineInteractionAllowed()) return;
+
     if(formationSetupActive) {
         setMessage("⚙️ Durante a formação, escolha somente casas dentro do campo.", 0);
         return;
@@ -6373,6 +7013,8 @@ function teamCanReceiveReserve(player) {
 
 function activateCard(player, slotIndex, cpuInitiated = false) {
 
+    if(isOnlineMode() && !formationSetupActive && !onlineInteractionAllowed()) return;
+
     if(periodBreakActive) return;
     if(moveAnimationActive) return;
     if(isCpuMode() && player === CPU_PLAYER && !cpuInitiated) {
@@ -6530,6 +7172,7 @@ function cancelCardMode() {
 }
 
 function chooseReserveRole(player, role) {
+    if(isOnlineMode() && !onlineInteractionAllowed()) return;
     if(
         !cardTargetMode ||
         cardTargetMode.cardId !== 2 ||
@@ -6547,6 +7190,7 @@ function chooseReserveRole(player, role) {
 }
 
 function chooseExpelledPlayer(player, pieceId) {
+    if(isOnlineMode() && !onlineInteractionAllowed()) return;
     if(
         !cardTargetMode ||
         cardTargetMode.cardId !== 2 ||
@@ -8110,6 +8754,11 @@ function render() {
     renderCards();
     updateInterface();
 
+    // No multiplayer, qualquer alteração legítima feita pelo jogador da vez
+    // é enviada ao adversário. A função possui debounce e ignora renders
+    // recebidos do próprio Supabase.
+    scheduleOnlineStatePublish(false);
+
 }
 
 
@@ -8122,7 +8771,11 @@ function selectPiece(
 ) {
 
     if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive) {
-        setMessage("🌐 Aguarde: as jogadas online ainda estão bloqueadas nesta etapa beta.", 0);
+        setMessage("🌐 Sincronizando a partida...", 0);
+        return;
+    }
+
+    if(isOnlineMode() && !formationSetupActive && !onlineInteractionAllowed()) {
         return;
     }
 
@@ -8254,7 +8907,11 @@ function handleCellClick(
 ) {
 
     if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive) {
-        setMessage("🌐 Aguarde: as jogadas online ainda estão bloqueadas nesta etapa beta.", 0);
+        setMessage("🌐 Sincronizando a partida...", 0);
+        return;
+    }
+
+    if(isOnlineMode() && !formationSetupActive && !onlineInteractionAllowed()) {
         return;
     }
 
@@ -8494,7 +9151,11 @@ function playNextDiceRollAudio() {
 function rollDice() {
 
     if(isOnlineMode() && onlineLobbyState.gameplayLocked && !formationSetupActive && !kickoffDrawPending) {
-        setMessage("🌐 Formação e pontapé já estão sincronizados. As jogadas online serão liberadas na próxima etapa.", 0);
+        setMessage("🌐 Sincronizando o início da partida...", 0);
+        return;
+    }
+
+    if(isOnlineMode() && !formationSetupActive && !kickoffDrawPending && !onlineInteractionAllowed()) {
         return;
     }
 
@@ -8707,6 +9368,10 @@ function rollDice() {
                     }
 
 
+                    if(isOnlineMode()) {
+                        scheduleOnlineStatePublish(true);
+                    }
+
                     if(catimbaApplied && diceValue === 0) {
                         setMessage(
                             `🐢 CATIMBA! Saiu 1 → anda 0 casas. ${playerName(currentPlayer)} perde esta vez.`
@@ -8809,7 +9474,8 @@ function isClockPlayActive() {
         winner === null &&
         !cardVideoActive &&
         !moveAnimationActive &&
-        !rankingOverlayOpen
+        (!rankingOverlayOpen || isOnlineMode()) &&
+        !(isOnlineMode() && (onlineLocalConnectionLostAt || onlineOpponentDisconnectedSince))
     );
 }
 
@@ -9147,13 +9813,17 @@ function tickGameClocks() {
 
     updateClockDisplays();
 
+    // No online, apenas o dispositivo do jogador da vez efetiva
+    // eventos de relógio. O outro lado apenas exibe a contagem.
+    const canResolveOnlineClock = !isOnlineMode() || getOnlineLocalPlayerIndex() === currentPlayer;
+
     // Fim do tempo de jogo tem prioridade sobre o limite do turno.
     if(matchTimeRemainingMs <= 0) {
-        handleMatchPeriodEnd();
+        if(canResolveOnlineClock) handleMatchPeriodEnd();
         return;
     }
 
-    if(turnTimeRemainingMs <= 0) {
+    if(turnTimeRemainingMs <= 0 && canResolveOnlineClock) {
         handleTurnTimeout();
     }
 }
@@ -9461,6 +10131,11 @@ function registerGoal(scoringPlayer, scoringPiece = null) {
             (removedBlocks > 0 ? ` 🚧 ${removedBlocks} BLOCK${removedBlocks > 1 ? 'S foram removidos' : ' foi removido'} no gol final.` : '')
         );
 
+        if(isOnlineMode()) {
+            onlineGoalResumeAt = null;
+            scheduleOnlineStatePublish(true);
+        }
+
         showVictory(true, scoringPlayer);
         return;
 
@@ -9476,12 +10151,27 @@ function registerGoal(scoringPlayer, scoringPiece = null) {
         `${concedingName} dará a saída.`
     );
 
+    if(isOnlineMode()) {
+        onlineGoalResumeAt = Date.now() + ONLINE_GOAL_BREAK_MS;
+    }
+
     showVictory(false, scoringPlayer);
 
-    scheduleGoalCelebration(() => {
+    if(isOnlineMode()) {
+        // No online o estado pós-gol precisa ser gravado pelo jogador que
+        // marcou ANTES de a vez passar definitivamente ao adversário.
+        // Por isso a reposição tática é aplicada ao snapshot imediatamente;
+        // a tela de gol continua cobrindo o campo durante os 10 segundos.
         createPieces();
+        startOnlineGoalCountdown();
         render();
-    }, 850);
+        scheduleOnlineStatePublish(true);
+    } else {
+        scheduleGoalCelebration(() => {
+            createPieces();
+            render();
+        }, 850);
+    }
 
 }
 
@@ -9496,7 +10186,13 @@ function continueAfterGoal() {
     cpuCardUsedThisTurn = false;
     cpuResetManageResultTurnState();
     goalPause = false;
+    onlineGoalResumeAt = null;
+    if(onlineGoalTimer) { clearInterval(onlineGoalTimer); onlineGoalTimer = null; }
+    hideOnlinePhaseTimer();
     resetTurnClock();
+
+    const victoryButton = document.getElementById("victoryButton");
+    if(victoryButton) victoryButton.disabled = false;
 
     clearGoalCelebrationVisuals(true);
 
@@ -9517,6 +10213,10 @@ function handleOverlayButton() {
     if(winner !== null) {
         newGame();
     } else {
+        if(isOnlineMode()) {
+            setMessage("🌐 O reinício após o gol acontece automaticamente em 10 segundos.", 0);
+            return;
+        }
         continueAfterGoal();
     }
 
@@ -9604,15 +10304,33 @@ function updateInterface() {
     }
 
     if(currentPlayer === 0) {
-        setTurnDisplay(isCpuMode() ? (cpuThinking ? `🤖 CPU ${playerName(0)} PENSANDO...` : `VEZ DA CPU • ${playerName(0)} 🤖`) : `VEZ DO ${playerName(0)}`);
+        if(isOnlineMode()) {
+            setTurnDisplay(getOnlineLocalPlayerIndex() === 0
+                ? `🌐 SUA VEZ • ${playerName(0)}`
+                : `🌐 AGUARDE • ${playerName(0)}`);
+        } else {
+            setTurnDisplay(isCpuMode() ? (cpuThinking ? `🤖 CPU ${playerName(0)} PENSANDO...` : `VEZ DA CPU • ${playerName(0)} 🤖`) : `VEZ DO ${playerName(0)}`);
+        }
         blue.classList.add("active");
     } else {
-        setTurnDisplay(`VEZ DO ${playerName(1)}`);
+        if(isOnlineMode()) {
+            setTurnDisplay(getOnlineLocalPlayerIndex() === 1
+                ? `🌐 SUA VEZ • ${playerName(1)}`
+                : `🌐 AGUARDE • ${playerName(1)}`);
+        } else {
+            setTurnDisplay(`VEZ DO ${playerName(1)}`);
+        }
         red.classList.add("active");
     }
 
     document.querySelectorAll(".dice-button").forEach(button => {
-        button.disabled = isCpuTurn() || (isOnlineMode() && onlineLobbyState.gameplayLocked);
+        const onlineBlocked = isOnlineMode() && (
+            onlineLobbyState.gameplayLocked ||
+            getOnlineLocalPlayerIndex() !== currentPlayer ||
+            Boolean(onlineLocalConnectionLostAt) ||
+            Boolean(onlineOpponentDisconnectedSince)
+        );
+        button.disabled = isCpuTurn() || onlineBlocked;
     });
 
 }
@@ -9823,7 +10541,14 @@ function playFinalVictoryAudio() {
 function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
 
     if(matchEnded) {
-        registerOfficialMatchToRanking(scoringPlayer);
+        if(isOnlineMode()) {
+            // O multiplayer ainda está em beta. O resultado online será
+            // gravado para os DOIS perfis em uma etapa específica do ranking
+            // online, evitando contabilização duplicada por dois navegadores.
+            setRankingSaveStatus("🌐 Partida online finalizada • validação do ranking online em fase beta.", "pending");
+        } else {
+            registerOfficialMatchToRanking(scoringPlayer);
+        }
     } else {
         setRankingSaveStatus("", "");
     }
@@ -10341,17 +11066,10 @@ function spinKickoffRoulette() {
             if(isOnlineMode()) {
                 onlineLobbyState.gameplayLocked = true;
                 matchClockRunning = false;
+
+                setMessage("🌐 Sorteio concluído. Sincronizando o início da partida...", 0);
+
                 markOnlineRoomPlaying();
-
-                document.querySelectorAll(".dice-button").forEach(diceButton => {
-                    diceButton.disabled = true;
-                });
-
-                setMessage(
-                    `🌐 ${sector.name} venceu o sorteio. Formação e pontapé inicial sincronizados nos dois dispositivos.`,
-                    0
-                );
-
                 render();
                 return;
             }

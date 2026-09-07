@@ -1206,6 +1206,539 @@ function finishRulesFlow() {
 }
 
 
+
+// ============================================================
+// MULTIPLAYER ONLINE — FASE 1 / LOBBY BETA
+// Sincronização leve por polling. O tabuleiro ainda NÃO inicia.
+// ============================================================
+const ONLINE_LOBBY_POLL_MS = 1500;
+
+let onlineLobbyState = {
+    roomId: null,
+    roomCode: "",
+    roomStatus: "",
+    callerSide: "",
+    hostPlayerId: null,
+    hostUsername: "",
+    hostClub: "",
+    guestPlayerId: null,
+    guestUsername: "",
+    guestClub: "",
+    pollingTimer: null,
+    requestBusy: false
+};
+
+function resetOnlineLobbyState() {
+    if(onlineLobbyState.pollingTimer) {
+        clearInterval(onlineLobbyState.pollingTimer);
+    }
+
+    onlineLobbyState = {
+        roomId: null,
+        roomCode: "",
+        roomStatus: "",
+        callerSide: "",
+        hostPlayerId: null,
+        hostUsername: "",
+        hostClub: "",
+        guestPlayerId: null,
+        guestUsername: "",
+        guestClub: "",
+        pollingTimer: null,
+        requestBusy: false
+    };
+}
+
+function normalizeOnlineRoomCode(input) {
+    if(!input) return;
+    input.value = String(input.value || "")
+        .toUpperCase()
+        .replace(/[^A-F0-9]/g, "")
+        .slice(0, 6);
+}
+
+function setOnlineLobbyError(message = "", roomView = false) {
+    const element = document.getElementById(
+        roomView ? "onlineRoomError" : "onlineLobbyHomeError"
+    );
+
+    if(!element) return;
+    element.textContent = message;
+    element.style.display = message ? "block" : "none";
+}
+
+async function onlineRpc(functionName, payload) {
+    const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/${functionName}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "apikey": SUPABASE_PUBLISHABLE_KEY
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    if(!response.ok) {
+        let detail = "";
+
+        try {
+            const errorPayload = await response.json();
+            const parts = [
+                errorPayload?.message,
+                errorPayload?.details,
+                errorPayload?.hint,
+                errorPayload?.code ? `código ${errorPayload.code}` : ""
+            ].filter(Boolean);
+
+            detail = parts.join(" • ");
+        } catch(error) {
+            // Usa status HTTP abaixo.
+        }
+
+        throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data[0] : data;
+}
+
+function getOnlineSessionPayload() {
+    return {
+        p_player_id: currentUserIdentity.playerId,
+        p_session_token: currentUserIdentity.sessionToken
+    };
+}
+
+function showOnlineLobbyOverlay() {
+    const overlay = document.getElementById("onlineLobbyOverlay");
+    const home = document.getElementById("onlineLobbyHome");
+    const room = document.getElementById("onlineRoomView");
+    const username = document.getElementById("onlineLoggedUsername");
+    const input = document.getElementById("onlineRoomCodeInput");
+
+    if(!overlay) return;
+
+    resetOnlineLobbyState();
+
+    if(username) {
+        username.textContent = currentUserIdentity.username || "JOGADOR";
+    }
+
+    if(input) input.value = "";
+
+    if(home) home.style.display = "block";
+    if(room) room.style.display = "none";
+
+    setOnlineLobbyError("", false);
+    setOnlineLobbyError("", true);
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+async function closeOnlineLobby(leaveRoom = false) {
+    if(leaveRoom && onlineLobbyState.roomCode) {
+        try {
+            await onlineRpc("cardbol_online_leave_room", {
+                ...getOnlineSessionPayload(),
+                p_room_code: onlineLobbyState.roomCode
+            });
+        } catch(error) {
+            console.warn("CardBol online leave:", error);
+        }
+    }
+
+    resetOnlineLobbyState();
+
+    const overlay = document.getElementById("onlineLobbyOverlay");
+    if(overlay) {
+        overlay.classList.remove("show");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+
+    gameMode = null;
+    showGameModeOverlay();
+}
+
+function applyOnlineRoomData(result) {
+    if(!result || result.success !== true) {
+        const status = result?.status || "UNKNOWN";
+        throw new Error(`Sala indisponível (${status}).`);
+    }
+
+    onlineLobbyState.roomId = result.room_id || null;
+    onlineLobbyState.roomCode = result.room_code || "";
+    onlineLobbyState.roomStatus = result.room_status || "";
+    onlineLobbyState.callerSide = result.caller_side || "";
+
+    onlineLobbyState.hostPlayerId = result.host_player_id || null;
+    onlineLobbyState.hostUsername = result.host_username || "";
+    onlineLobbyState.hostClub = result.host_club || "";
+
+    onlineLobbyState.guestPlayerId = result.guest_player_id || null;
+    onlineLobbyState.guestUsername = result.guest_username || "";
+    onlineLobbyState.guestClub = result.guest_club || "";
+
+    if(onlineLobbyState.hostClub) {
+        teamAssignments[1] = onlineLobbyState.hostClub;
+    }
+
+    if(onlineLobbyState.guestClub) {
+        teamAssignments[0] = onlineLobbyState.guestClub;
+    }
+
+    renderOnlineLobby();
+}
+
+function startOnlineLobbyPolling() {
+    if(onlineLobbyState.pollingTimer) {
+        clearInterval(onlineLobbyState.pollingTimer);
+    }
+
+    onlineLobbyState.pollingTimer = setInterval(() => {
+        refreshOnlineRoom();
+    }, ONLINE_LOBBY_POLL_MS);
+}
+
+async function createOnlineRoom() {
+    if(onlineLobbyState.requestBusy) return;
+
+    const button = document.getElementById("onlineCreateRoomButton");
+
+    onlineLobbyState.requestBusy = true;
+    setOnlineLobbyError("", false);
+
+    if(button) {
+        button.disabled = true;
+        button.textContent = "⏳ CRIANDO SALA...";
+    }
+
+    try {
+        const result = await onlineRpc("cardbol_online_create_room", {
+            ...getOnlineSessionPayload()
+        });
+
+        applyOnlineRoomData(result);
+
+        const home = document.getElementById("onlineLobbyHome");
+        const room = document.getElementById("onlineRoomView");
+
+        if(home) home.style.display = "none";
+        if(room) room.style.display = "block";
+
+        startOnlineLobbyPolling();
+
+    } catch(error) {
+        setOnlineLobbyError(
+            `⚠ ${String(error?.message || "Não foi possível criar a sala.")}`,
+            false
+        );
+    } finally {
+        onlineLobbyState.requestBusy = false;
+
+        if(button) {
+            button.disabled = false;
+            button.innerHTML = "➕ CRIAR SALA<small>Gerar um código para convidar</small>";
+        }
+    }
+}
+
+async function joinOnlineRoom() {
+    if(onlineLobbyState.requestBusy) return;
+
+    const input = document.getElementById("onlineRoomCodeInput");
+    const button = document.getElementById("onlineJoinRoomButton");
+    const code = String(input?.value || "").trim().toUpperCase();
+
+    if(!/^[A-F0-9]{6}$/.test(code)) {
+        setOnlineLobbyError("Digite o código de 6 caracteres da sala.", false);
+        return;
+    }
+
+    onlineLobbyState.requestBusy = true;
+    setOnlineLobbyError("", false);
+
+    if(button) {
+        button.disabled = true;
+        button.textContent = "⏳ ENTRANDO...";
+    }
+
+    try {
+        const result = await onlineRpc("cardbol_online_join_room", {
+            ...getOnlineSessionPayload(),
+            p_room_code: code
+        });
+
+        applyOnlineRoomData(result);
+
+        const home = document.getElementById("onlineLobbyHome");
+        const room = document.getElementById("onlineRoomView");
+
+        if(home) home.style.display = "none";
+        if(room) room.style.display = "block";
+
+        startOnlineLobbyPolling();
+
+    } catch(error) {
+        setOnlineLobbyError(
+            `⚠ ${String(error?.message || "Não foi possível entrar na sala.")}`,
+            false
+        );
+    } finally {
+        onlineLobbyState.requestBusy = false;
+        if(button) button.textContent = "🔗 ENTRAR NA SALA";
+        if(button) button.disabled = false;
+    }
+}
+
+async function refreshOnlineRoom() {
+    if(
+        !onlineLobbyState.roomCode ||
+        onlineLobbyState.requestBusy
+    ) return;
+
+    onlineLobbyState.requestBusy = true;
+
+    try {
+        const result = await onlineRpc("cardbol_online_get_room", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+
+        applyOnlineRoomData(result);
+
+        const poll = document.getElementById("onlinePollingStatus");
+        if(poll) {
+            poll.textContent = `● Sala sincronizada às ${new Date().toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            })}`;
+        }
+
+        setOnlineLobbyError("", true);
+
+    } catch(error) {
+        setOnlineLobbyError(
+            `⚠ ${String(error?.message || "Falha ao atualizar a sala.")}`,
+            true
+        );
+    } finally {
+        onlineLobbyState.requestBusy = false;
+    }
+}
+
+function buildOnlineClubCard(teamKey, disabled, selected) {
+    const club = CLUBS[teamKey];
+    if(!club) return "";
+
+    const cardClass = club.cardClass || "";
+    const disabledClass = disabled ? " online-club-disabled" : "";
+    const selectedClass = selected ? " online-club-selected" : "";
+
+    return `
+        <button
+            type="button"
+            class="online-club-card ${cardClass}${disabledClass}${selectedClass}"
+            onclick="chooseOnlineClub('${teamKey}')"
+            ${disabled ? 'disabled aria-disabled="true"' : ""}
+        >
+            <img src="imagens/clubes/${club.folder}/logo.png" alt="Escudo do ${club.shortName}">
+            <span>${club.name}</span>
+            ${selected ? "<small>SEU TIME ✓</small>" : ""}
+        </button>
+    `;
+}
+
+function renderOnlineLobby() {
+    const code = document.getElementById("onlineRoomCodeDisplay");
+    const status = document.getElementById("onlineRoomStatus");
+
+    const hostName = document.getElementById("onlineHostName");
+    const hostClub = document.getElementById("onlineHostClub");
+    const guestName = document.getElementById("onlineGuestName");
+    const guestClub = document.getElementById("onlineGuestClub");
+
+    const clubSection = document.getElementById("onlineClubSection");
+    const clubTitle = document.getElementById("onlineClubTitle");
+    const clubGrid = document.getElementById("onlineClubGrid");
+    const readyBox = document.getElementById("onlineReadyBox");
+
+    if(code) code.textContent = onlineLobbyState.roomCode || "------";
+
+    if(hostName) {
+        hostName.textContent = onlineLobbyState.hostUsername || "—";
+    }
+
+    if(hostClub) {
+        hostClub.textContent = onlineLobbyState.hostClub
+            ? teamShortNameFromKey(onlineLobbyState.hostClub)
+            : "Clube não escolhido";
+    }
+
+    if(guestName) {
+        guestName.textContent = onlineLobbyState.guestUsername || "AGUARDANDO...";
+    }
+
+    if(guestClub) {
+        guestClub.textContent = onlineLobbyState.guestClub
+            ? teamShortNameFromKey(onlineLobbyState.guestClub)
+            : "Clube não escolhido";
+    }
+
+    const hasGuest = Boolean(onlineLobbyState.guestPlayerId);
+    const ready = (
+        hasGuest &&
+        Boolean(onlineLobbyState.hostClub) &&
+        Boolean(onlineLobbyState.guestClub) &&
+        onlineLobbyState.roomStatus === "ready"
+    );
+
+    if(status) {
+        if(ready) {
+            status.textContent = "✅ Os dois jogadores estão prontos.";
+            status.className = "online-room-status ready";
+        } else if(hasGuest) {
+            status.textContent = "🎮 Adversário conectado. Escolham seus clubes.";
+            status.className = "online-room-status connected";
+        } else {
+            status.textContent = "⏳ Aguardando adversário entrar com o código...";
+            status.className = "online-room-status";
+        }
+    }
+
+    if(clubSection) {
+        clubSection.style.display = hasGuest ? "block" : "none";
+    }
+
+    if(readyBox) {
+        readyBox.style.display = ready ? "flex" : "none";
+    }
+
+    if(!hasGuest || !clubGrid) return;
+
+    const callerIsHost = onlineLobbyState.callerSide === "host";
+    const myClub = callerIsHost
+        ? onlineLobbyState.hostClub
+        : onlineLobbyState.guestClub;
+
+    const opponentClub = callerIsHost
+        ? onlineLobbyState.guestClub
+        : onlineLobbyState.hostClub;
+
+    if(clubTitle) {
+        clubTitle.textContent = callerIsHost
+            ? "🔴 ESCOLHA SEU CLUBE — LADO VERMELHO"
+            : "🔵 ESCOLHA SEU CLUBE — LADO AZUL";
+    }
+
+    clubGrid.innerHTML = AVAILABLE_TEAM_KEYS.map(teamKey => {
+        const disabled = Boolean(opponentClub && opponentClub === teamKey);
+        const selected = myClub === teamKey;
+        return buildOnlineClubCard(teamKey, disabled, selected);
+    }).join("");
+
+    if(ready) {
+        applyTeamBranding();
+    }
+}
+
+function teamShortNameFromKey(teamKey) {
+    return CLUBS[teamKey]?.shortName || teamKey || "—";
+}
+
+async function chooseOnlineClub(teamKey) {
+    if(
+        !AVAILABLE_TEAM_KEYS.includes(teamKey) ||
+        !onlineLobbyState.roomCode ||
+        onlineLobbyState.requestBusy
+    ) return;
+
+    onlineLobbyState.requestBusy = true;
+    setOnlineLobbyError("", true);
+
+    try {
+        const result = await onlineRpc("cardbol_online_choose_club", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_club: teamKey
+        });
+
+        applyOnlineRoomData(result);
+
+    } catch(error) {
+        setOnlineLobbyError(
+            `⚠ ${String(error?.message || "Não foi possível escolher o clube.")}`,
+            true
+        );
+    } finally {
+        onlineLobbyState.requestBusy = false;
+    }
+}
+
+async function leaveOnlineRoom() {
+    if(!onlineLobbyState.roomCode) {
+        await closeOnlineLobby(false);
+        return;
+    }
+
+    try {
+        await onlineRpc("cardbol_online_leave_room", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+    } catch(error) {
+        console.warn("CardBol online leave:", error);
+    }
+
+    resetOnlineLobbyState();
+
+    const home = document.getElementById("onlineLobbyHome");
+    const room = document.getElementById("onlineRoomView");
+
+    if(home) home.style.display = "block";
+    if(room) room.style.display = "none";
+
+    gameMode = null;
+    hideOnlineLobbyOverlayOnly();
+    showGameModeOverlay();
+}
+
+function hideOnlineLobbyOverlayOnly() {
+    const overlay = document.getElementById("onlineLobbyOverlay");
+    if(!overlay) return;
+
+    overlay.classList.remove("show");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+async function copyOnlineRoomCode() {
+    const code = onlineLobbyState.roomCode;
+    if(!code) return;
+
+    try {
+        await navigator.clipboard.writeText(code);
+
+        const status = document.getElementById("onlineRoomStatus");
+        if(status) {
+            const previous = status.textContent;
+            status.textContent = "📋 Código copiado!";
+            setTimeout(() => {
+                if(status.textContent === "📋 Código copiado!") {
+                    status.textContent = previous;
+                }
+            }, 1200);
+        }
+    } catch(error) {
+        // Fallback simples para navegadores sem Clipboard API.
+        window.prompt("Copie o código da sala:", code);
+    }
+}
+
+
 function showTeamSelectOverlay() {
     const overlay = document.getElementById("teamSelectOverlay");
     if(!overlay) return;
@@ -1384,11 +1917,18 @@ function selectSideTeam(teamKey) {
     render();
 }
 function selectGameMode(mode) {
-    if(mode !== "pvp" && mode !== "cpu") return;
+    if(mode !== "pvp" && mode !== "cpu" && mode !== "online") return;
 
     clearCpuTimers();
     gameMode = mode;
     hideGameModeOverlay();
+
+    if(mode === "online") {
+        showOnlineLobbyOverlay();
+        setMessage("🌐 Lobby 1×1 online aberto.", 0);
+        return;
+    }
+
     applyTeamBranding();
     showTeamSelectOverlay();
 

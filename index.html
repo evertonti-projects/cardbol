@@ -238,8 +238,14 @@
         <div class="game-mode-buttons">
             <button class="game-mode-button pvp-mode" type="button" onclick="selectGameMode('pvp')">
                 👥 2 JOGADORES
-                <small>Escolha os dois clubes desta partida</small>
+                <small>Dois jogadores no mesmo dispositivo</small>
             </button>
+
+            <button class="game-mode-button online-mode" type="button" onclick="selectGameMode('online')">
+                🌐 1×1 ONLINE
+                <small>Crie uma sala ou entre com um código</small>
+            </button>
+
             <button class="game-mode-button cpu-mode" type="button" onclick="selectGameMode('cpu')">
                 🤖 CONTRA CPU
                 <small>Escolha seu clube e o time da CPU</small>
@@ -256,6 +262,135 @@
     </div>
 </div>
 
+
+
+<div id="onlineLobbyOverlay" class="online-lobby-overlay" aria-hidden="true">
+    <div class="online-lobby-panel">
+        <div class="online-lobby-header">
+            <div>
+                <div class="online-lobby-kicker">CARDBOL MULTIPLAYER • BETA</div>
+                <h2 class="online-lobby-title">🌐 1×1 ONLINE</h2>
+            </div>
+
+            <button
+                class="online-lobby-close"
+                type="button"
+                onclick="closeOnlineLobby(true)"
+                aria-label="Fechar lobby online"
+            >
+                ✕
+            </button>
+        </div>
+
+        <div id="onlineLobbyHome" class="online-lobby-home">
+            <div class="online-player-logged">
+                👤 Jogando como <strong id="onlineLoggedUsername">JOGADOR</strong>
+            </div>
+
+            <p class="online-lobby-intro">
+                Crie uma sala e envie o código para seu adversário, ou entre em uma sala existente.
+            </p>
+
+            <div class="online-lobby-main-actions">
+                <button
+                    id="onlineCreateRoomButton"
+                    class="online-main-button create"
+                    type="button"
+                    onclick="createOnlineRoom()"
+                >
+                    ➕ CRIAR SALA
+                    <small>Gerar um código para convidar</small>
+                </button>
+
+                <div class="online-join-box">
+                    <label for="onlineRoomCodeInput">CÓDIGO DA SALA</label>
+                    <input
+                        id="onlineRoomCodeInput"
+                        class="online-room-code-input"
+                        type="text"
+                        maxlength="6"
+                        autocomplete="off"
+                        autocapitalize="characters"
+                        spellcheck="false"
+                        placeholder="ABC123"
+                        oninput="normalizeOnlineRoomCode(this)"
+                    >
+                    <button
+                        id="onlineJoinRoomButton"
+                        class="online-main-button join"
+                        type="button"
+                        onclick="joinOnlineRoom()"
+                    >
+                        🔗 ENTRAR NA SALA
+                    </button>
+                </div>
+            </div>
+
+            <div id="onlineLobbyHomeError" class="online-lobby-error"></div>
+        </div>
+
+        <div id="onlineRoomView" class="online-room-view">
+            <div class="online-room-top">
+                <div>
+                    <div class="online-room-label">CÓDIGO DA SALA</div>
+                    <div id="onlineRoomCodeDisplay" class="online-room-code">------</div>
+                </div>
+
+                <button
+                    class="online-copy-code"
+                    type="button"
+                    onclick="copyOnlineRoomCode()"
+                >
+                    📋 COPIAR CÓDIGO
+                </button>
+            </div>
+
+            <div id="onlineRoomStatus" class="online-room-status">
+                ⏳ Aguardando adversário...
+            </div>
+
+            <div class="online-players-grid">
+                <div id="onlineHostCard" class="online-player-card red">
+                    <div class="online-player-side">🔴 LADO VERMELHO</div>
+                    <div id="onlineHostName" class="online-player-name">—</div>
+                    <div id="onlineHostClub" class="online-player-club">Clube não escolhido</div>
+                </div>
+
+                <div class="online-versus">×</div>
+
+                <div id="onlineGuestCard" class="online-player-card blue">
+                    <div class="online-player-side">🔵 LADO AZUL</div>
+                    <div id="onlineGuestName" class="online-player-name">AGUARDANDO...</div>
+                    <div id="onlineGuestClub" class="online-player-club">Clube não escolhido</div>
+                </div>
+            </div>
+
+            <div id="onlineClubSection" class="online-club-section">
+                <div id="onlineClubTitle" class="online-club-title">ESCOLHA SEU CLUBE</div>
+                <div id="onlineClubGrid" class="online-club-grid"></div>
+            </div>
+
+            <div id="onlineReadyBox" class="online-ready-box">
+                <strong>✅ LOBBY PRONTO!</strong>
+                <span>Os dois jogadores estão conectados e os clubes foram definidos.</span>
+                <small>Na próxima etapa vamos sincronizar formação, dado, movimentos e cartas.</small>
+            </div>
+
+            <div id="onlineRoomError" class="online-lobby-error"></div>
+
+            <div class="online-room-footer">
+                <span id="onlinePollingStatus">● Atualizando sala...</span>
+                <button
+                    class="online-leave-room"
+                    type="button"
+                    onclick="leaveOnlineRoom()"
+                >
+                    SAIR DA SALA
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="teamSelectOverlay" class="team-select-overlay" aria-hidden="true">
     <div class="team-select-panel">

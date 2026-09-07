@@ -845,6 +845,7 @@ function openRankingOverlay() {
     {
         if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
         if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
+    if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
 
         const deadline = Date.now() + ONLINE_RANKING_LIMIT_MS;
         const tick = () => {
@@ -1262,7 +1263,12 @@ let onlineLobbyState = {
     formationModeStarted: false,
     kickoffShown: false,
     formationSubmitBusy: false,
-    gameplayLocked: true
+    gameplayLocked: true,
+    halftimeHostFormation: null,
+    halftimeGuestFormation: null,
+    halftimeHostConfirmed: false,
+    halftimeGuestConfirmed: false,
+    halftimeStartedAt: null
 };
 
 // ============================================================
@@ -1296,6 +1302,11 @@ let onlineOpponentInterruptions = 0;
 let onlineGameFinishedByPresence = false;
 let onlineRankingAutoCloseTimer = null;
 let onlineRankingCountdownTimer = null;
+let onlineHalftimePollingTimer = null;
+let onlineHalftimeFinishBusy = false;
+let onlineVisualEvent = null;
+let onlineLastHandledVisualEventId = null;
+let onlineRemoteVisualPlayback = false;
 
 function clearOnlinePhaseTimers() {
     if(onlineFormationTimer) clearInterval(onlineFormationTimer);
@@ -1305,6 +1316,7 @@ function clearOnlinePhaseTimers() {
     if(onlineReconnectUiTimer) clearInterval(onlineReconnectUiTimer);
     if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
     if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
+    if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
 
     onlineFormationTimer = null;
     onlineGoalTimer = null;
@@ -1313,6 +1325,7 @@ function clearOnlinePhaseTimers() {
     onlineReconnectUiTimer = null;
     onlineRankingAutoCloseTimer = null;
     onlineRankingCountdownTimer = null;
+    onlineHalftimePollingTimer = null;
 }
 
 function resetOnlineGameplaySyncState() {
@@ -1331,6 +1344,10 @@ function resetOnlineGameplaySyncState() {
     onlineLocalInterruptions = 0;
     onlineOpponentInterruptions = 0;
     onlineGameFinishedByPresence = false;
+    onlineHalftimeFinishBusy = false;
+    onlineVisualEvent = null;
+    onlineLastHandledVisualEventId = null;
+    onlineRemoteVisualPlayback = false;
     hideOnlinePhaseTimer();
     hideOnlineReconnectOverlay();
 }
@@ -1372,7 +1389,11 @@ function startOnlineFormationCountdown() {
             onlineFormationTimer = null;
             hideOnlinePhaseTimer();
             setMessage("⏱ 30s encerrados. Formação atual enviada automaticamente.", 0);
-            confirmOnlineFormation();
+            if(formationSetupReason === "halftime") {
+                confirmOnlineHalftimeFormation();
+            } else {
+                confirmOnlineFormation();
+            }
         }
     };
 
@@ -1398,8 +1419,8 @@ function startOnlineGoalCountdown() {
 
         const button = document.getElementById("victoryButton");
         if(button) {
-            button.disabled = true;
-            button.textContent = `REINÍCIO EM ${Math.max(0, Math.ceil(remaining/1000))}s`;
+            button.disabled = false;
+            button.textContent = `CONTINUAR AGORA • ${Math.max(0, Math.ceil(remaining/1000))}s`;
         }
 
         if(remaining <= 0) {
@@ -1481,10 +1502,159 @@ function onlineInteractionAllowed(showMessage = true) {
     return true;
 }
 
+
+function makeOnlineVisualEventId() {
+    if(window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function emitOnlineVisualEvent(type, payload = {}) {
+    if(
+        !isOnlineMode() ||
+        onlineApplyingRemoteState ||
+        onlineRemoteVisualPlayback ||
+        onlineLobbyState.roomStatus !== "playing"
+    ) return;
+
+    onlineVisualEvent = {
+        id: makeOnlineVisualEventId(),
+        type,
+        payload,
+        createdAt: Date.now()
+    };
+
+    scheduleOnlineStatePublish(true);
+}
+
+function playRemoteMoveGhost(event) {
+    const payload = event?.payload || {};
+    const fromRow = Number(payload.fromRow);
+    const fromCol = Number(payload.fromCol);
+    const path = Array.isArray(payload.path) ? payload.path : [];
+
+    if(!Number.isFinite(fromRow) || !Number.isFinite(fromCol) || !path.length) return;
+
+    const piece = pieces.find(candidate => (
+        candidate.player === Number(payload.player) &&
+        String(candidate.id) === String(payload.id) &&
+        !!candidate.reserve === !!payload.reserve
+    ));
+    if(!piece) return;
+
+    const source = getVisualCenterForPosition(fromRow, fromCol);
+    const centers = path.map(point => getVisualCenterForPosition(Number(point.row), Number(point.col)));
+    if(!source || centers.some(center => !center)) return;
+
+    const realElement = getPieceElement(piece);
+    if(!realElement || typeof realElement.animate !== "function") return;
+
+    const rect = realElement.getBoundingClientRect();
+    const ghost = realElement.cloneNode(true);
+    ghost.classList.remove("selected", "formation-selected", "moving");
+    ghost.style.position = "fixed";
+    ghost.style.left = `${source.x - rect.width / 2}px`;
+    ghost.style.top = `${source.y - rect.height / 2}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.margin = "0";
+    ghost.style.zIndex = "12000";
+    ghost.style.pointerEvents = "none";
+    document.body.appendChild(ghost);
+
+    const oldVisibility = realElement.style.visibility;
+    realElement.style.visibility = "hidden";
+
+    const keyframes = [{transform:"translate3d(0,0,0)", offset:0}];
+    centers.forEach((center,index) => {
+        keyframes.push({
+            transform:`translate3d(${center.x-source.x}px, ${center.y-source.y}px, 0)`,
+            offset:(index+1)/centers.length
+        });
+    });
+
+    playPieceSlideAudio();
+    const animation = ghost.animate(keyframes, {
+        duration: Math.min(720, Math.max(240, path.length * 95 + 90)),
+        easing: "cubic-bezier(.42, 0, .20, 1)",
+        fill: "forwards"
+    });
+
+    const cleanup = () => {
+        ghost.remove();
+        realElement.style.visibility = oldVisibility;
+
+        const lastPoint = path[path.length - 1];
+        const livePiece = pieces.find(candidate => (
+            candidate.player === Number(payload.player) &&
+            String(candidate.id) === String(payload.id) &&
+            !!candidate.reserve === !!payload.reserve
+        ));
+
+        // Se o snapshot final ainda não chegou, mantém visualmente a peça
+        // no destino da animação até a próxima revisão confirmar o estado.
+        if(
+            livePiece &&
+            livePiece.row === fromRow &&
+            livePiece.col === fromCol &&
+            lastPoint
+        ) {
+            livePiece.row = Number(lastPoint.row);
+            livePiece.col = Number(lastPoint.col);
+            render();
+        }
+    };
+    animation.onfinish = cleanup;
+    animation.oncancel = cleanup;
+}
+
+function playRemoteCardVideo(cardId) {
+    onlineRemoteVisualPlayback = true;
+    const finish = () => { onlineRemoteVisualPlayback = false; };
+
+    switch(Number(cardId)) {
+        case 1: showCard1ExpulsionVideo(finish); break;
+        case 2: showCard2BloodNewVideo(finish); break;
+        case 3: showCard3SprintVideo(finish); break;
+        case 4: showCard4PassVideo(finish); break;
+        case 7: showCard7PlannedPlayVideo(finish); break;
+        case 8: showCard8BlockVideo(finish); break;
+        case 9: showCard9RetreatVideo(finish); break;
+        case 10: showCard10CatimbaVideo(finish); break;
+        default: onlineRemoteVisualPlayback = false;
+    }
+}
+
+function handleOnlineVisualEvent(event) {
+    if(!isOnlineMode() || !event || !event.id) return;
+    if(event.id === onlineLastHandledVisualEventId) return;
+
+    onlineLastHandledVisualEventId = event.id;
+
+    if(event.createdAt && Date.now() - Number(event.createdAt) > 8000) return;
+
+    if(event.type === "move") {
+        playRemoteMoveGhost(event);
+    } else if(event.type === "card") {
+        playRemoteCardVideo(event.payload?.cardId);
+    }
+}
+
 function serializeOnlineGameState() {
     return {
-        version: 1,
+        version: 2,
         currentPlayer,
+        formationSetupActive,
+        formationSetupReason,
+        formationSetupPlayer,
+        selectedPieceRef: selectedPiece ? {
+            player: selectedPiece.player,
+            id: selectedPiece.id,
+            reserve: !!selectedPiece.reserve,
+            role: selectedPiece.role
+        } : null,
+        visualEvent: onlineVisualEvent,
         scoreBlue,
         scoreRed,
         diceValue,
@@ -1533,6 +1703,17 @@ function restoreOnlineGameState(state) {
 
     try {
         currentPlayer = Number(state.currentPlayer) === 1 ? 1 : 0;
+
+        if(typeof state.formationSetupActive === "boolean") {
+            formationSetupActive = state.formationSetupActive;
+        }
+        if(state.formationSetupReason === "initial" || state.formationSetupReason === "halftime") {
+            formationSetupReason = state.formationSetupReason;
+        }
+        if(state.formationSetupPlayer === 0 || state.formationSetupPlayer === 1 || state.formationSetupPlayer === null) {
+            formationSetupPlayer = state.formationSetupPlayer;
+        }
+
         scoreBlue = Math.max(0, Number(state.scoreBlue) || 0);
         scoreRed = Math.max(0, Number(state.scoreRed) || 0);
         diceValue = state.diceValue === null ? null : Number(state.diceValue);
@@ -1616,7 +1797,12 @@ function restoreOnlineGameState(state) {
         if(Array.isArray(state.startingFormation)) startingFormation = state.startingFormation;
         onlineGoalResumeAt = state.goalResumeAt ? Number(state.goalResumeAt) : null;
 
-        selectedPiece = null;
+        const selectedRef = state.selectedPieceRef;
+        selectedPiece = selectedRef ? pieces.find(piece => (
+            piece.player === Number(selectedRef.player) &&
+            String(piece.id) === String(selectedRef.id) &&
+            !!piece.reserve === !!selectedRef.reserve
+        )) || null : null;
         formationSelectedPiece = null;
         cardTargetMode = null;
         lastClockTickAt = Date.now();
@@ -1630,6 +1816,19 @@ function restoreOnlineGameState(state) {
 
         updateScoreboard();
         render();
+
+        handleOnlineVisualEvent(state.visualEvent);
+
+        if(periodBreakActive && periodBreakType === "secondHalf" && winner === null) {
+            showPeriodOverlay(
+                "⏱ FIM DO 1º TEMPO",
+                `Intervalo. Placar: ${getScoreLineText()}. Cada jogador terá 30s para organizar seu próprio time.`,
+                "⚙ AJUSTAR MINHA FORMAÇÃO",
+                "secondHalf"
+            );
+        } else if(!periodBreakActive && formationSetupReason !== "halftime") {
+            hidePeriodOverlay();
+        }
 
         const scoredRed = scoreRed > oldScoreRed;
         const scoredBlue = scoreBlue > oldScoreBlue;
@@ -1729,7 +1928,8 @@ function scheduleOnlineStatePublish(force = false) {
         !isOnlineMode() ||
         onlineApplyingRemoteState ||
         onlineLobbyState.roomStatus !== "playing" ||
-        onlineGameFinishedByPresence
+        onlineGameFinishedByPresence ||
+        (formationSetupActive && formationSetupReason === "halftime")
     ) return;
 
     const localPlayer = getOnlineLocalPlayerIndex();
@@ -1902,7 +2102,12 @@ function resetOnlineLobbyState() {
         formationModeStarted: false,
         kickoffShown: false,
         formationSubmitBusy: false,
-        gameplayLocked: true
+        gameplayLocked: true,
+        halftimeHostFormation: null,
+        halftimeGuestFormation: null,
+        halftimeHostConfirmed: false,
+        halftimeGuestConfirmed: false,
+        halftimeStartedAt: null
     };
 }
 
@@ -1916,6 +2121,12 @@ function getOnlineLocalPlayerIndex() {
 
 function isOnlineLocalFormationConfirmed() {
     if(!isOnlineMode()) return false;
+
+    if(formationSetupReason === "halftime") {
+        return onlineLobbyState.callerSide === "host"
+            ? onlineLobbyState.halftimeHostConfirmed
+            : onlineLobbyState.halftimeGuestConfirmed;
+    }
 
     return onlineLobbyState.callerSide === "host"
         ? onlineLobbyState.hostFormationConfirmed
@@ -4885,7 +5096,275 @@ function prepareHalftimeFormationPieces() {
     }
 }
 
+
+function prepareHalftimeFormationForPlayer(player) {
+    const activePieces = pieces.filter(piece => piece.player === player);
+
+    activePieces.forEach(piece => {
+        piece.row = -100;
+        piece.col = -100;
+    });
+
+    const ordered = [...activePieces].sort((a,b) => {
+        if(!!a.reserve !== !!b.reserve) return a.reserve ? 1 : -1;
+        return String(a.id).localeCompare(String(b.id));
+    });
+
+    for(const piece of ordered) {
+        let chosen = null;
+
+        if(!piece.reserve && Number.isInteger(piece.id)) {
+            const saved = startingFormation[piece.player]?.[piece.id];
+            if(
+                saved &&
+                getFormationRows(piece.player,piece.role).includes(saved.row) &&
+                !getPieceAt(saved.row,saved.col,piece) &&
+                !isBlockedCell(saved.row,saved.col)
+            ) {
+                chosen = {row:saved.row,col:saved.col};
+            }
+        }
+
+        if(!chosen) chosen = getHalftimeFormationFallbackCell(piece);
+        if(chosen) {
+            piece.row = chosen.row;
+            piece.col = chosen.col;
+        }
+    }
+}
+
+function serializeHalftimeFormationForPlayer(player) {
+    return pieces
+        .filter(piece => piece.player === player)
+        .map(piece => ({
+            id: piece.id,
+            role: piece.role,
+            reserve: !!piece.reserve,
+            row: piece.row,
+            col: piece.col
+        }));
+}
+
+function applyHalftimeFormationToPlayer(player, formation) {
+    if(!Array.isArray(formation)) return;
+
+    formation.forEach(item => {
+        const piece = pieces.find(candidate => (
+            candidate.player === player &&
+            String(candidate.id) === String(item.id) &&
+            !!candidate.reserve === !!item.reserve &&
+            String(candidate.role) === String(item.role)
+        ));
+        if(!piece) return;
+
+        const row = Number(item.row);
+        const col = Number(item.col);
+        if(Number.isInteger(row) && Number.isInteger(col)) {
+            piece.row = row;
+            piece.col = col;
+        }
+    });
+}
+
+async function beginOnlineHalftimeFormationSetup() {
+    if(!isOnlineMode()) return;
+
+    hidePeriodOverlay();
+
+    try {
+        const result = await onlineRpc("cardbol_online_begin_halftime", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+        if(!result || result.success !== true) {
+            throw new Error(result?.status || "falha ao iniciar intervalo");
+        }
+    } catch(error) {
+        setMessage(`⚠ Não foi possível iniciar o intervalo online: ${String(error?.message || error)}`, 0);
+        return;
+    }
+
+    matchPeriod = 2;
+    extraPeriodNumber = 0;
+    matchTimeRemainingMs = REGULATION_PERIOD_MS;
+    periodBreakActive = true;
+    periodBreakType = "secondHalf";
+    formationSetupReason = "halftime";
+    formationSetupActive = true;
+    formationSetupPlayer = getOnlineLocalPlayerIndex();
+    formationSelectedPiece = null;
+    selectedPiece = null;
+    cardTargetMode = null;
+    diceValue = null;
+    diceRolled = false;
+    resetDiceDisplay();
+
+    prepareHalftimeFormationForPlayer(formationSetupPlayer);
+    resetTurnClock();
+
+    onlineLobbyState.halftimeHostFormation = null;
+    onlineLobbyState.halftimeGuestFormation = null;
+    onlineLobbyState.halftimeHostConfirmed = false;
+    onlineLobbyState.halftimeGuestConfirmed = false;
+
+    setMessage(`🌐 INTERVALO: organize ${playerName(formationSetupPlayer)}. Você tem 30 segundos.`, 0);
+    render();
+    startOnlineFormationCountdown();
+    startOnlineHalftimePolling();
+    pollOnlineHalftime();
+}
+
+async function confirmOnlineHalftimeFormation() {
+    if(
+        !isOnlineMode() ||
+        formationSetupReason !== "halftime" ||
+        !formationSetupActive ||
+        onlineLobbyState.formationSubmitBusy ||
+        isOnlineLocalFormationConfirmed()
+    ) return;
+
+    const localPlayer = getOnlineLocalPlayerIndex();
+    const formation = serializeHalftimeFormationForPlayer(localPlayer);
+    onlineLobbyState.formationSubmitBusy = true;
+    formationSelectedPiece = null;
+    render();
+
+    try {
+        const result = await onlineRpc("cardbol_online_confirm_halftime", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_formation: formation
+        });
+
+        applyOnlineHalftimeData(result);
+        setMessage("🌐 Formação do 2º tempo enviada. Aguardando o adversário...", 0);
+    } catch(error) {
+        setMessage(`⚠ Falha ao enviar formação do 2º tempo: ${String(error?.message || error)}`, 0);
+    } finally {
+        onlineLobbyState.formationSubmitBusy = false;
+        render();
+    }
+}
+
+function applyOnlineHalftimeData(result) {
+    if(!result || result.success !== true) return;
+
+    onlineLobbyState.halftimeHostFormation = result.host_formation || null;
+    onlineLobbyState.halftimeGuestFormation = result.guest_formation || null;
+    onlineLobbyState.halftimeHostConfirmed = result.host_confirmed === true;
+    onlineLobbyState.halftimeGuestConfirmed = result.guest_confirmed === true;
+    onlineLobbyState.halftimeStartedAt = result.halftime_started_at || null;
+
+    if(Array.isArray(onlineLobbyState.halftimeHostFormation)) {
+        applyHalftimeFormationToPlayer(1, onlineLobbyState.halftimeHostFormation);
+    }
+    if(Array.isArray(onlineLobbyState.halftimeGuestFormation)) {
+        applyHalftimeFormationToPlayer(0, onlineLobbyState.halftimeGuestFormation);
+    }
+
+    const localConfirmed = isOnlineLocalFormationConfirmed();
+    const bothConfirmed = onlineLobbyState.halftimeHostConfirmed && onlineLobbyState.halftimeGuestConfirmed;
+
+    if(localConfirmed) {
+        if(onlineFormationTimer) clearInterval(onlineFormationTimer);
+        onlineFormationTimer = null;
+        hideOnlinePhaseTimer();
+    }
+
+    if(bothConfirmed) {
+        if(onlineLobbyState.callerSide === "host") {
+            finishOnlineHalftimeIfReady();
+        } else {
+            setMessage("🌐 As duas formações foram confirmadas. Iniciando o 2º tempo...", 0);
+        }
+    } else if(localConfirmed) {
+        setMessage("🌐 Formação enviada. Aguardando o adversário confirmar a dele...", 0);
+    }
+
+    render();
+}
+
+async function pollOnlineHalftime() {
+    if(!isOnlineMode() || formationSetupReason !== "halftime" || !onlineLobbyState.roomCode) return;
+
+    try {
+        const result = await onlineRpc("cardbol_online_get_halftime", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+        applyOnlineHalftimeData(result);
+    } catch(error) {
+        console.warn("CardBol halftime sync:", error);
+    }
+}
+
+function startOnlineHalftimePolling() {
+    if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
+    onlineHalftimePollingTimer = setInterval(pollOnlineHalftime, ONLINE_GAME_POLL_MS);
+}
+
+async function finishOnlineHalftimeIfReady() {
+    if(onlineHalftimeFinishBusy || onlineLobbyState.callerSide !== "host") return;
+    if(!onlineLobbyState.halftimeHostConfirmed || !onlineLobbyState.halftimeGuestConfirmed) return;
+
+    onlineHalftimeFinishBusy = true;
+
+    applyHalftimeFormationToPlayer(1, onlineLobbyState.halftimeHostFormation);
+    applyHalftimeFormationToPlayer(0, onlineLobbyState.halftimeGuestFormation);
+
+    formationSetupActive = false;
+    formationSetupReason = "initial";
+    formationSetupPlayer = null;
+    formationSelectedPiece = null;
+    selectedPiece = null;
+    periodBreakActive = false;
+    periodBreakType = null;
+    currentPlayer = getPeriodKickoffPlayer(2);
+    diceValue = null;
+    diceRolled = false;
+    matchTimeRemainingMs = REGULATION_PERIOD_MS;
+    resetTurnClock();
+    matchClockRunning = true;
+    lastClockTickAt = Date.now();
+    resetDiceDisplay();
+
+    try {
+        const state = serializeOnlineGameState();
+        const result = await onlineRpc("cardbol_online_finish_halftime", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_state: state
+        });
+
+        if(!result || result.success !== true) throw new Error(result?.status || "falha ao iniciar 2º tempo");
+
+        onlineGameRevision = Number(result.game_revision) || onlineGameRevision;
+        onlineLastAppliedRevision = onlineGameRevision;
+        onlineServerActivePlayer = Number(result.active_player);
+        onlineLastPublishedSignature = onlineStateSignature(state);
+
+        if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
+        onlineHalftimePollingTimer = null;
+        hideOnlinePhaseTimer();
+        hidePeriodOverlay();
+        setMessage(`▶ 2º TEMPO ONLINE! ${playerName(currentPlayer)} dará a saída.`, 0);
+        render();
+    } catch(error) {
+        formationSetupActive = true;
+        formationSetupReason = "halftime";
+        formationSetupPlayer = getOnlineLocalPlayerIndex();
+        setMessage(`⚠ Não foi possível iniciar o 2º tempo: ${String(error?.message || error)}`, 0);
+    } finally {
+        onlineHalftimeFinishBusy = false;
+    }
+}
+
 function beginHalftimeFormationSetup() {
+    if(isOnlineMode()) {
+        beginOnlineHalftimeFormationSetup();
+        return;
+    }
+
     formationSetupReason = "halftime";
     formationSetupActive = true;
     formationSetupPlayer = 1;
@@ -4951,7 +5430,11 @@ function confirmFormation() {
     if(!formationSetupActive) return;
 
     if(isOnlineMode()) {
-        confirmOnlineFormation();
+        if(formationSetupReason === "halftime") {
+            confirmOnlineHalftimeFormation();
+        } else {
+            confirmOnlineFormation();
+        }
         return;
     }
 
@@ -6299,6 +6782,24 @@ function playPieceSlideAudio() {
 
 function animatePieceAlongPath(piece, path, onComplete) {
     if(moveAnimationActive) return false;
+
+    if(
+        isOnlineMode() &&
+        !onlineApplyingRemoteState &&
+        !onlineRemoteVisualPlayback &&
+        Array.isArray(path) &&
+        path.length
+    ) {
+        emitOnlineVisualEvent("move", {
+            player: piece.player,
+            id: piece.id,
+            reserve: !!piece.reserve,
+            role: piece.role,
+            fromRow: piece.row,
+            fromCol: piece.col,
+            path: path.map(point => ({row:point.row, col:point.col}))
+        });
+    }
 
     const element = getPieceElement(piece);
 
@@ -7846,6 +8347,10 @@ function retreatWithCard9(piece) {
 
 function showCard1ExpulsionVideo(onFinish = null) {
 
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:1});
+    }
+
     const overlay = document.getElementById("cardVideoOverlay");
     const video = document.getElementById("cardVideoPlayer");
 
@@ -7913,6 +8418,10 @@ function showCard1ExpulsionVideo(onFinish = null) {
 }
 
 function showCard2BloodNewVideo(onFinish = null) {
+
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:2});
+    }
 
     const overlay = document.getElementById("card2VideoOverlay");
     const video = document.getElementById("card2VideoPlayer");
@@ -7982,6 +8491,10 @@ function showCard2BloodNewVideo(onFinish = null) {
 
 function showCard3SprintVideo(onFinish = null) {
 
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:3});
+    }
+
     const overlay = document.getElementById("card3VideoOverlay");
     const video = document.getElementById("card3VideoPlayer");
 
@@ -8035,6 +8548,10 @@ function showCard3SprintVideo(onFinish = null) {
 
 function showCard4PassVideo(onFinish = null) {
 
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:4});
+    }
+
     const overlay = document.getElementById("card4VideoOverlay");
     const video = document.getElementById("card4VideoPlayer");
 
@@ -8086,6 +8603,10 @@ function showCard4PassVideo(onFinish = null) {
 
 function showCard7PlannedPlayVideo(onFinish = null) {
 
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:7});
+    }
+
     const overlay = document.getElementById("card7VideoOverlay");
     const video = document.getElementById("card7VideoPlayer");
 
@@ -8136,6 +8657,10 @@ function showCard7PlannedPlayVideo(onFinish = null) {
 }
 
 function showCard8BlockVideo(onFinish = null) {
+
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:8});
+    }
 
     const overlay = document.getElementById("card8VideoOverlay");
     const video = document.getElementById("card8VideoPlayer");
@@ -8203,6 +8728,10 @@ function showCard8BlockVideo(onFinish = null) {
 
 function showCard9RetreatVideo(onFinish = null) {
 
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:9});
+    }
+
     const overlay = document.getElementById("card9VideoOverlay");
     const video = document.getElementById("card9VideoPlayer");
 
@@ -8253,6 +8782,10 @@ function showCard9RetreatVideo(onFinish = null) {
 }
 
 function showCard10CatimbaVideo(onFinish = null) {
+
+    if(!onlineRemoteVisualPlayback && !onlineApplyingRemoteState) {
+        emitOnlineVisualEvent("card", {cardId:10});
+    }
 
     const overlay = document.getElementById("card10VideoOverlay");
     const video = document.getElementById("card10VideoPlayer");
@@ -9795,6 +10328,10 @@ function continueMatchPeriod() {
     hidePeriodOverlay();
 
     if(requestedBreakType === "secondHalf") {
+        if(isOnlineMode()) {
+            beginOnlineHalftimeFormationSetup();
+            return;
+        }
         matchPeriod = 2;
         extraPeriodNumber = 0;
         matchTimeRemainingMs = REGULATION_PERIOD_MS;
@@ -10237,13 +10774,47 @@ function continueAfterGoal() {
 }
 
 
+
+async function resumeOnlineAfterGoalNow(retryCount = 0) {
+    if(!isOnlineMode() || !goalPause || winner !== null || !onlineLobbyState.roomCode) return;
+
+    const button = document.getElementById("victoryButton");
+    if(button) {
+        button.disabled = true;
+        button.textContent = "⏳ RETOMANDO...";
+    }
+
+    try {
+        const result = await onlineRpc("cardbol_online_resume_after_goal", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode
+        });
+
+        if(!result || result.success !== true) {
+            throw new Error(result?.status || "falha no reinício");
+        }
+
+        // Se o clique foi rápido demais e o snapshot do gol ainda estava
+        // chegando ao servidor, tenta novamente por alguns milissegundos.
+        if(result.status === "ALREADY_RESUMED" && goalPause && retryCount < 4) {
+            setTimeout(() => resumeOnlineAfterGoalNow(retryCount + 1), 250);
+            return;
+        }
+
+        await pollOnlineGameState();
+    } catch(error) {
+        setMessage(`⚠ Não foi possível retomar agora: ${String(error?.message || error)}`, 0);
+        if(button) button.disabled = false;
+    }
+}
+
 function handleOverlayButton() {
 
     if(winner !== null) {
         newGame();
     } else {
         if(isOnlineMode()) {
-            setMessage("🌐 O reinício após o gol acontece automaticamente em 10 segundos.", 0);
+            resumeOnlineAfterGoalNow();
             return;
         }
         continueAfterGoal();
@@ -10836,6 +11407,8 @@ function newGame() {
     // Isso impede duplicidade no Supabase.
     currentMatchKey = createCardBolMatchKey();
     matchRankingSubmissionStarted = false;
+    onlineVisualEvent = null;
+    onlineLastHandledVisualEventId = null;
     setRankingSaveStatus("", "");
     closeRankingOverlay();
 

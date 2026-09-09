@@ -5925,3 +5925,94 @@ button.bench-carousel-item:hover {
         font-size: 7px;
     }
 }
+
+/* =========================================================
+   HUMOR DA CPU NO PLACAR — CHACOTA / RAIVA
+========================================================= */
+.cpu-score-mood {
+    display: none;
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    font-size: 22px;
+    line-height: 1;
+    transform-origin: center;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));
+}
+
+.cpu-score-mood.show {
+    display: inline-flex;
+    width: 26px;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+}
+
+.cpu-score-mood.taunt {
+    text-shadow: 0 0 9px rgba(250,204,21,.48);
+}
+
+.cpu-score-mood.anger {
+    text-shadow: 0 0 10px rgba(239,68,68,.52);
+}
+
+.cpu-score-mood.mood-bounce { animation: cpuMoodBounce .72s ease-in-out infinite; }
+.cpu-score-mood.mood-spin   { animation: cpuMoodSpin 1.05s ease-in-out infinite; }
+.cpu-score-mood.mood-wiggle { animation: cpuMoodWiggle .58s ease-in-out infinite; }
+.cpu-score-mood.mood-shake  { animation: cpuMoodShake .24s linear infinite; }
+.cpu-score-mood.mood-pulse  { animation: cpuMoodPulse .62s ease-in-out infinite; }
+.cpu-score-mood.mood-stomp  { animation: cpuMoodStomp .48s ease-in-out infinite; }
+
+@keyframes cpuMoodBounce {
+    0%,100% { transform: translateY(0) scale(1); }
+    45% { transform: translateY(-6px) scale(1.12); }
+    70% { transform: translateY(1px) scale(.96); }
+}
+
+@keyframes cpuMoodSpin {
+    0%,100% { transform: rotate(-8deg) scale(1); }
+    50% { transform: rotate(16deg) scale(1.16); }
+}
+
+@keyframes cpuMoodWiggle {
+    0%,100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-13deg) scale(1.08); }
+    75% { transform: rotate(13deg) scale(1.08); }
+}
+
+@keyframes cpuMoodShake {
+    0%,100% { transform: translateX(0) rotate(0); }
+    25% { transform: translateX(-2px) rotate(-5deg); }
+    75% { transform: translateX(2px) rotate(5deg); }
+}
+
+@keyframes cpuMoodPulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+}
+
+@keyframes cpuMoodStomp {
+    0%,100% { transform: translateY(0) scale(1); }
+    55% { transform: translateY(3px) scale(1.13); }
+}
+
+@media (max-width: 900px) {
+    .cpu-score-mood {
+        font-size: 17px;
+    }
+
+    .cpu-score-mood.show {
+        width: 20px;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+    .cpu-score-mood {
+        font-size: 14px !important;
+    }
+
+    .cpu-score-mood.show {
+        width: 16px !important;
+    }
+}

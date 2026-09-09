@@ -497,32 +497,118 @@ let cpuCardUsedThisTurn = false;
 
 // ------------------------------------------------------------
 // CPU — ADMINISTRAR RESULTADO / FAZER CERA
-// 2º tempo + vencendo + últimos 3min = 80% dos turnos elegíveis.
+// Vencendo:
+//   • 1º tempo: ativa nos últimos 5 minutos.
+//   • 2º tempo: permanece elegível durante todo o tempo enquanto estiver na frente.
+// Em 4 de cada 5 turnos elegíveis, a CPU faz cera/retranca.
 // ------------------------------------------------------------
 const CPU_MANAGE_RESULT_CHANCE = 0.80;
-const CPU_MANAGE_RESULT_WINDOW_MS = 3 * 60 * 1000;
+const CPU_MANAGE_RESULT_FIRST_HALF_WINDOW_MS = 5 * 60 * 1000;
 const CPU_MANAGE_RESULT_DELAYS_MS = [10_000, 20_000, 30_000];
+const CPU_MOOD_CHANCE = 0.40; // 2 de cada 5 turnos
+
+const CPU_TAUNT_MOODS = [
+    { emoji: "😂", animation: "bounce" },
+    { emoji: "🤣", animation: "spin" },
+    { emoji: "😜", animation: "wiggle" }
+];
+
+const CPU_ANGER_MOODS = [
+    { emoji: "😡", animation: "shake" },
+    { emoji: "🤬", animation: "pulse" },
+    { emoji: "😤", animation: "stomp" }
+];
 
 let cpuManageResultDecisionMade = false;
 let cpuManageResultThisTurn = false;
 let cpuManageResultDelayApplied = false;
 let cpuManageResultDelayMs = 0;
+let cpuMoodDecisionMade = false;
+let cpuMoodTimer = null;
 
 function cpuIsWinningOnScore() {
     return scoreBlue > scoreRed;
 }
 
+function cpuIsLosingOnScore() {
+    return scoreBlue < scoreRed;
+}
+
 function cpuCanManageResultNow() {
-    return (
-        isCpuTurn() &&
-        matchClockRunning &&
-        matchPeriod === 2 &&
+    if(
+        !isCpuTurn() ||
+        !matchClockRunning ||
+        !cpuIsWinningOnScore() ||
+        winner !== null ||
+        goalPause
+    ) {
+        return false;
+    }
+
+    const lateFirstHalf = (
+        matchPeriod === 1 &&
         matchTimeRemainingMs > 0 &&
-        matchTimeRemainingMs <= CPU_MANAGE_RESULT_WINDOW_MS &&
-        cpuIsWinningOnScore() &&
-        winner === null &&
-        !goalPause
+        matchTimeRemainingMs <= CPU_MANAGE_RESULT_FIRST_HALF_WINDOW_MS
     );
+
+    const secondHalf = (
+        matchPeriod === 2 &&
+        matchTimeRemainingMs > 0
+    );
+
+    return lateFirstHalf || secondHalf;
+}
+
+function clearCpuMoodEmoji() {
+    if(cpuMoodTimer) {
+        clearTimeout(cpuMoodTimer);
+        cpuMoodTimer = null;
+    }
+
+    const mood = document.getElementById("cpuScoreMoodEmoji");
+    if(!mood) return;
+
+    mood.textContent = "";
+    mood.className = "cpu-score-mood";
+    mood.setAttribute("aria-hidden", "true");
+}
+
+function showCpuMoodEmoji(type) {
+    const mood = document.getElementById("cpuScoreMoodEmoji");
+    if(!mood || !isCpuMode()) return;
+
+    const options = type === "taunt" ? CPU_TAUNT_MOODS : CPU_ANGER_MOODS;
+    const chosen = options[Math.floor(Math.random() * options.length)];
+
+    clearCpuMoodEmoji();
+    mood.textContent = chosen.emoji;
+    mood.className = `cpu-score-mood show ${type} mood-${chosen.animation}`;
+    mood.setAttribute("aria-hidden", "false");
+
+    // Reinicia a animação mesmo se o mesmo emoji for sorteado novamente.
+    void mood.offsetWidth;
+
+    cpuMoodTimer = setTimeout(() => {
+        clearCpuMoodEmoji();
+    }, 4800);
+}
+
+function cpuMaybeShowMoodForTurn() {
+    if(cpuMoodDecisionMade || !isCpuTurn() || !isCpuMode()) return;
+    cpuMoodDecisionMade = true;
+
+    // Chacota somente quando o turno realmente entrou no modo retranca/cera.
+    if(cpuManageResultThisTurn) {
+        if(Math.random() < CPU_MOOD_CHANCE) {
+            showCpuMoodEmoji("taunt");
+        }
+        return;
+    }
+
+    // Quando está atrás no placar, demonstra irritação em 2 de cada 5 turnos.
+    if(cpuIsLosingOnScore() && Math.random() < CPU_MOOD_CHANCE) {
+        showCpuMoodEmoji("anger");
+    }
 }
 
 function cpuResetManageResultTurnState() {
@@ -530,6 +616,8 @@ function cpuResetManageResultTurnState() {
     cpuManageResultThisTurn = false;
     cpuManageResultDelayApplied = false;
     cpuManageResultDelayMs = 0;
+    cpuMoodDecisionMade = false;
+    clearCpuMoodEmoji();
 }
 
 function cpuPrepareManageResultForTurn() {
@@ -3658,30 +3746,30 @@ function cpuManageResultMoveBonus(
     const defensiveRole = ["ZG","LE","LD"].includes(piece.role);
     const midfieldRole = ["ME","MD"].includes(piece.role);
 
-    // Recuar em direção ao próprio gol passa a valer muito mais.
+    // No modo retranca o recuo passa a ser uma prioridade dominante.
     if(retreat > 0) {
-        if(defensiveRole) bonus += retreat * 24;
-        else if(midfieldRole) bonus += retreat * 18;
-        else if(piece.role === "ATK") bonus += retreat * 6;
+        if(defensiveRole) bonus += retreat * 40;
+        else if(midfieldRole) bonus += retreat * 31;
+        else if(piece.role === "ATK") bonus += retreat * 12;
     } else if(retreat < 0) {
-        if(defensiveRole) bonus -= Math.abs(retreat) * 30;
-        else if(midfieldRole) bonus -= Math.abs(retreat) * 22;
-        else if(piece.role === "ATK") bonus -= Math.abs(retreat) * 5;
+        if(defensiveRole) bonus -= Math.abs(retreat) * 52;
+        else if(midfieldRole) bonus -= Math.abs(retreat) * 39;
+        else if(piece.role === "ATK") bonus -= Math.abs(retreat) * 12;
     }
 
-    // Forma uma linha de proteção nas proximidades do gol.
+    // Forma duas linhas compactas e protege fortemente os 3 corredores do gol.
     if(defensiveRole || midfieldRole) {
-        if(target.row >= 12) bonus += 28;
-        if(target.row >= 14) bonus += 34;
-        if(target.row >= 15) bonus += 22;
+        if(target.row >= 11) bonus += 26;
+        if(target.row >= 12) bonus += 38;
+        if(target.row >= 14) bonus += 48;
+        if(target.row >= 15) bonus += 30;
 
-        // Prioriza os três corredores centrais de entrada do gol.
-        bonus += Math.max(0, 3 - centerDistance) * 22;
+        bonus += Math.max(0, 3 - centerDistance) * 36;
     }
 
-    // O ganho real de cobertura/diminuição de perigo ganha peso extra.
-    bonus += (afterCoverage - beforeCoverage) * 5.2;
-    bonus += (beforeDanger - afterDanger) * 2.1;
+    // Cobertura e redução do perigo passam a dominar a avaliação da jogada.
+    bonus += (afterCoverage - beforeCoverage) * 8.4;
+    bonus += (beforeDanger - afterDanger) * 3.4;
 
     return bonus;
 }
@@ -4829,6 +4917,7 @@ function scheduleCpuIfNeeded(delay=850) {
     if(cpuActionTimer) clearTimeout(cpuActionTimer);
 
     cpuPrepareManageResultForTurn();
+    cpuMaybeShowMoodForTurn();
 
     let scheduledDelay = delay;
 
@@ -4838,7 +4927,7 @@ function scheduleCpuIfNeeded(delay=850) {
 
         const seconds = Math.round(cpuManageResultDelayMs / 1000);
         setMessage(
-            `🤖 CPU está administrando a vantagem... pensando a jogada (${seconds}s).`
+            `😏 CPU entrou na retranca e está fazendo cera... pensando a jogada (${seconds}s).`
         );
     }
 

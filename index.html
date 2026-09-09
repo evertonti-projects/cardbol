@@ -827,7 +827,7 @@
     <div class="ranking-panel" role="dialog" aria-modal="true" aria-labelledby="rankingTitle">
         <div class="ranking-header">
             <div>
-                <div class="ranking-kicker">CARDBOL • CLASSIFICAÇÃO GERAL</div>
+                <div class="ranking-kicker">CARDBOL • SUA CLASSIFICAÇÃO</div>
                 <h2 id="rankingTitle" class="ranking-title">🏆 RANKING</h2>
             </div>
 
@@ -844,15 +844,9 @@
         <div class="ranking-summary">
             Vitória <strong>+3 pts</strong> • Derrota <strong>−1 pt</strong>
         </div>
-
-        <div class="ranking-level-tabs" role="tablist" aria-label="Níveis do ranking">
-            <button class="ranking-level-tab" type="button" data-level="rookie" onclick="setRankingLevelFilter('rookie')">INICIANTE<br><small>0–19 V</small></button>
-            <button class="ranking-level-tab" type="button" data-level="level1" onclick="setRankingLevelFilter('level1')">NÍVEL 1<br><small>20–49 V</small></button>
-            <button class="ranking-level-tab" type="button" data-level="level2" onclick="setRankingLevelFilter('level2')">NÍVEL 2<br><small>50–124 V</small></button>
-            <button class="ranking-level-tab" type="button" data-level="level3" onclick="setRankingLevelFilter('level3')">NÍVEL 3<br><small>125+ V</small></button>
+        <div id="rankingLevelInfo" class="ranking-level-info">
+            Identificando sua classificação...
         </div>
-
-        <div id="rankingLevelInfo" class="ranking-level-info"></div>
 
         <div id="rankingLoading" class="ranking-loading">
             ⏳ Carregando classificação...

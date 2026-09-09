@@ -902,7 +902,6 @@ const RANKING_LEVELS = {
     level3: { label: "NÍVEL 3", minWins: 125, maxWins: null, nextWins: null }
 };
 
-let currentRankingLevelFilter = "rookie";
 
 function getRankingLevelKeyByWins(winsValue) {
     const wins = Math.max(0, Number(winsValue) || 0);
@@ -968,41 +967,43 @@ async function refreshPlayerLevelTheme() {
     }
 }
 
-function updateRankingLevelUI() {
-    document.querySelectorAll(".ranking-level-tab").forEach(button => {
-        const active = button.dataset.level === currentRankingLevelFilter;
-        button.classList.toggle("active", active);
-        button.setAttribute("aria-selected", active ? "true" : "false");
-    });
+function getCurrentUserRankingLevelKey() {
+    return currentUserIdentity.levelKey ||
+        getRankingLevelKeyByWins(currentUserIdentity.wins);
+}
 
+function updateRankingLevelUI() {
     const info = document.getElementById("rankingLevelInfo");
     if(!info) return;
 
-    const config = RANKING_LEVELS[currentRankingLevelFilter] || RANKING_LEVELS.rookie;
-    const ownLevel = currentUserIdentity.levelKey === currentRankingLevelFilter;
-    let text = `${config.label} • ${config.maxWins === null ? `${config.minWins}+ vitórias` : `${config.minWins}–${config.maxWins} vitórias`}`;
+    const levelKey = getCurrentUserRankingLevelKey();
+    const config = RANKING_LEVELS[levelKey] || RANKING_LEVELS.rookie;
+    const wins = Math.max(0, Number(currentUserIdentity.wins) || 0);
 
-    if(ownLevel) {
-        if(config.nextWins) {
-            const remaining = Math.max(0, config.nextWins - (Number(currentUserIdentity.wins) || 0));
-            text += ` • VOCÊ: ${currentUserIdentity.wins} V • faltam ${remaining} para o próximo nível`;
-        } else {
-            text += ` • VOCÊ: ${currentUserIdentity.wins} V • nível máximo atual`;
-        }
+    let rangeText = config.maxWins === null
+        ? `${config.minWins}+ vitórias`
+        : `${config.minWins}–${config.maxWins} vitórias`;
+
+    let progressText = "";
+
+    if(config.nextWins) {
+        const remaining = Math.max(0, config.nextWins - wins);
+        progressText = ` • Você: ${wins} V • faltam ${remaining} para o próximo nível`;
+    } else {
+        progressText = ` • Você: ${wins} V • nível máximo atual`;
     }
 
-    info.textContent = text;
+    info.innerHTML =
+        `<strong>${escapeRankingText(config.label)}</strong>` +
+        `<span>${escapeRankingText(rangeText + progressText)}</span>`;
 }
 
-function setRankingLevelFilter(levelKey) {
-    if(!RANKING_LEVELS[levelKey] || currentRankingLevelFilter === levelKey) return;
-    currentRankingLevelFilter = levelKey;
-    updateRankingLevelUI();
-    loadRankingData();
-}
+async function requestCardBolRanking(limit = 100) {
+    if(!currentUserIdentity.playerId || !currentUserIdentity.sessionToken) {
+        throw new Error("Sessão do jogador indisponível.");
+    }
 
-async function requestCardBolRanking(levelKey = currentRankingLevelFilter, limit = 100) {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_ranking_level`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_my_level_ranking`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -1010,13 +1011,15 @@ async function requestCardBolRanking(levelKey = currentRankingLevelFilter, limit
             "apikey": SUPABASE_PUBLISHABLE_KEY
         },
         body: JSON.stringify({
-            p_level: levelKey,
+            p_player_id: currentUserIdentity.playerId,
+            p_session_token: currentUserIdentity.sessionToken,
             p_limit: Math.max(1, Math.min(Number(limit) || 100, 500))
         })
     });
 
     if(!response.ok) {
         let detail = "";
+
         try {
             const errorPayload = await response.json();
             const parts = [
@@ -1025,8 +1028,10 @@ async function requestCardBolRanking(levelKey = currentRankingLevelFilter, limit
                 errorPayload?.hint,
                 errorPayload?.code ? `código ${errorPayload.code}` : ""
             ].filter(Boolean);
+
             detail = parts.join(" • ");
         } catch(error) {}
+
         throw new Error(detail || `HTTP ${response.status}`);
     }
 
@@ -1102,13 +1107,13 @@ async function loadRankingData() {
     }
     if(empty) {
         empty.style.display = "none";
-        empty.textContent = `Ainda não há jogadores classificados em ${getRankingLevelLabel(currentRankingLevelFilter)}.`;
+        empty.textContent = `Ainda não há jogadores com partidas oficiais em ${getRankingLevelLabel(getCurrentUserRankingLevelKey())}.`;
     }
     if(tableWrap) tableWrap.style.display = "none";
     updateRankingLevelUI();
 
     try {
-        const rows = await requestCardBolRanking(currentRankingLevelFilter, 100);
+        const rows = await requestCardBolRanking(100);
 
         if(requestId !== rankingRequestSequence) return;
 
@@ -1145,14 +1150,16 @@ function openRankingOverlay(openMode = "manual") {
     const postgame = openMode === "postgame";
     const limitMs = postgame ? RANKING_POSTGAME_LIMIT_MS : RANKING_MANUAL_LIMIT_MS;
 
-    currentRankingLevelFilter = currentUserIdentity.levelKey || getRankingLevelKeyByWins(currentUserIdentity.wins);
-    updateRankingLevelUI();
-
     rankingOverlayOpen = true;
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden", "false");
 
-    loadRankingData();
+    // Atualiza o total de vitórias antes de escolher automaticamente
+    // a classificação exibida.
+    refreshPlayerLevelTheme().finally(() => {
+        updateRankingLevelUI();
+        loadRankingData();
+    });
 
     // Ranking aberto automaticamente no fim da partida: 30s.
     // Ranking aberto manualmente pelo usuário: 10s.

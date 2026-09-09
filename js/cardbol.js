@@ -526,6 +526,119 @@ let cpuManageResultDelayMs = 0;
 let cpuMoodDecisionMade = false;
 let cpuMoodTimer = null;
 
+// ------------------------------------------------------------
+// REAÇÕES DO JOGADOR — CPU / 1×1 ONLINE
+// Botão 💬 com os mesmos 6 emojis usados pelo humor da CPU.
+// ------------------------------------------------------------
+const PLAYER_REACTION_EMOJIS = ["😂", "🤣", "😜", "😡", "🤬", "😤"];
+const PLAYER_REACTION_ANIMATIONS = {
+    "😂": "bounce",
+    "🤣": "spin",
+    "😜": "wiggle",
+    "😡": "shake",
+    "🤬": "pulse",
+    "😤": "stomp"
+};
+const playerReactionTimers = {0:null, 1:null};
+
+function getReactionElement(player) {
+    return document.getElementById(player === 1
+        ? "redPlayerReactionEmoji"
+        : "bluePlayerReactionEmoji");
+}
+
+function clearPlayerScoreReaction(player) {
+    if(playerReactionTimers[player]) {
+        clearTimeout(playerReactionTimers[player]);
+        playerReactionTimers[player] = null;
+    }
+
+    const element = getReactionElement(player);
+    if(!element) return;
+    element.textContent = "";
+    element.className = "player-score-reaction";
+    element.setAttribute("aria-hidden", "true");
+}
+
+function showPlayerScoreReaction(player, emoji) {
+    if(!PLAYER_REACTION_EMOJIS.includes(emoji)) return;
+
+    const element = getReactionElement(player);
+    if(!element) return;
+
+    clearPlayerScoreReaction(player);
+
+    const animation = PLAYER_REACTION_ANIMATIONS[emoji] || "bounce";
+    const type = ["😂","🤣","😜"].includes(emoji) ? "taunt" : "anger";
+
+    element.textContent = emoji;
+    element.className = `player-score-reaction show ${type} mood-${animation}`;
+    element.setAttribute("aria-hidden", "false");
+    void element.offsetWidth;
+
+    playerReactionTimers[player] = setTimeout(() => {
+        clearPlayerScoreReaction(player);
+    }, 4800);
+}
+
+function toggleReactionMenu() {
+    const control = document.getElementById("reactionControl");
+    const menu = document.getElementById("reactionMenu");
+    const button = document.getElementById("reactionToggleButton");
+    if(!control || !menu || !button || !control.classList.contains("show")) return;
+
+    const willOpen = !menu.classList.contains("show");
+    menu.classList.toggle("show", willOpen);
+    menu.setAttribute("aria-hidden", willOpen ? "false" : "true");
+    button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+}
+
+function closeReactionMenu() {
+    const menu = document.getElementById("reactionMenu");
+    const button = document.getElementById("reactionToggleButton");
+    if(menu) {
+        menu.classList.remove("show");
+        menu.setAttribute("aria-hidden", "true");
+    }
+    if(button) button.setAttribute("aria-expanded", "false");
+}
+
+function updateReactionControlVisibility() {
+    const control = document.getElementById("reactionControl");
+    if(!control) return;
+
+    const visible = (isCpuMode() || isOnlineMode()) && winner === null && matchClockRunning && !periodBreakActive;
+    control.classList.toggle("show", visible);
+    control.setAttribute("aria-hidden", visible ? "false" : "true");
+
+    if(!visible) closeReactionMenu();
+}
+
+async function sendPlayerReaction(emoji) {
+    if(!PLAYER_REACTION_EMOJIS.includes(emoji)) return;
+    if(!(isCpuMode() || isOnlineMode()) || winner !== null) return;
+
+    const localPlayer = isOnlineMode() ? getOnlineLocalPlayerIndex() : 1;
+    showPlayerScoreReaction(localPlayer, emoji);
+    closeReactionMenu();
+
+    if(!isOnlineMode()) return;
+
+    try {
+        const result = await onlineRpc("cardbol_online_send_reaction", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_emoji: emoji
+        });
+
+        if(result?.success === true && result.reaction_id) {
+            onlineLastReactionId = Math.max(onlineLastReactionId, Number(result.reaction_id) || 0);
+        }
+    } catch(error) {
+        console.warn("CardBol online reaction:", error);
+    }
+}
+
 function cpuIsWinningOnScore() {
     return scoreBlue > scoreRed;
 }
@@ -917,9 +1030,12 @@ async function loadRankingData() {
     }
 }
 
-function openRankingOverlay() {
+function openRankingOverlay(openMode = "manual") {
     const overlay = document.getElementById("rankingOverlay");
     if(!overlay) return;
+
+    const postgame = openMode === "postgame";
+    const limitMs = postgame ? RANKING_POSTGAME_LIMIT_MS : RANKING_MANUAL_LIMIT_MS;
 
     rankingOverlayOpen = true;
     overlay.classList.add("show");
@@ -927,25 +1043,25 @@ function openRankingOverlay() {
 
     loadRankingData();
 
-    // A tela de ranking permanece aberta por no máximo 10 segundos.
-    // No modo online o relógio da partida continua correndo para impedir
-    // que a consulta ao ranking seja usada para fazer cera.
+    // Ranking aberto automaticamente no fim da partida: 30s.
+    // Ranking aberto manualmente pelo usuário: 10s.
+    // No online, durante uma partida em andamento, o relógio continua correndo.
     {
         if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
         if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
-    if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
+        if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
 
-        const deadline = Date.now() + ONLINE_RANKING_LIMIT_MS;
+        const deadline = Date.now() + limitMs;
         const tick = () => {
             if(!rankingOverlayOpen) return;
             const remaining = deadline - Date.now();
-            showOnlinePhaseTimer("🏆 RANKING", remaining);
+            showOnlinePhaseTimer(postgame ? "🏆 RANKING • FIM DE JOGO" : "🏆 RANKING", remaining);
             if(remaining <= 0) closeRankingOverlay();
         };
 
         tick();
         onlineRankingCountdownTimer = setInterval(tick, 250);
-        onlineRankingAutoCloseTimer = setTimeout(closeRankingOverlay, ONLINE_RANKING_LIMIT_MS + 50);
+        onlineRankingAutoCloseTimer = setTimeout(closeRankingOverlay, limitMs + 50);
     }
 }
 
@@ -1109,8 +1225,8 @@ async function registerOfficialMatchToRanking(winningPlayer) {
             );
 
             setTimeout(() => {
-                if(currentMatchKey === submittedMatchKey && winner !== null) {
-                    openRankingOverlay();
+                if(currentMatchKey === submittedMatchKey && winner !== null && !rankingOverlayOpen) {
+                    openRankingOverlay("postgame");
                 }
             }, 900);
 
@@ -1127,8 +1243,8 @@ async function registerOfficialMatchToRanking(winningPlayer) {
         // No fim da partida, mostra automaticamente a classificação
         // já com o resultado recém-gravado.
         setTimeout(() => {
-            if(currentMatchKey === submittedMatchKey && winner !== null) {
-                openRankingOverlay();
+            if(currentMatchKey === submittedMatchKey && winner !== null && !rankingOverlayOpen) {
+                openRankingOverlay("postgame");
             }
         }, 900);
 
@@ -1364,7 +1480,8 @@ let onlineLobbyState = {
 // ============================================================
 const ONLINE_FORMATION_LIMIT_MS = 30 * 1000;
 const ONLINE_GOAL_BREAK_MS = 10 * 1000;
-const ONLINE_RANKING_LIMIT_MS = 10 * 1000;
+const RANKING_MANUAL_LIMIT_MS = 10 * 1000;
+const RANKING_POSTGAME_LIMIT_MS = 30 * 1000;
 const ONLINE_RECONNECT_LIMIT_MS = 30 * 1000;
 const ONLINE_MAX_INTERRUPTS = 5;
 const ONLINE_GAME_POLL_MS = 650;
@@ -1395,6 +1512,8 @@ let onlineHalftimeFinishBusy = false;
 let onlineVisualEvent = null;
 let onlineLastHandledVisualEventId = null;
 let onlineRemoteVisualPlayback = false;
+let onlineReactionPollTimer = null;
+let onlineLastReactionId = 0;
 
 function clearOnlinePhaseTimers() {
     if(onlineFormationTimer) clearInterval(onlineFormationTimer);
@@ -1405,6 +1524,7 @@ function clearOnlinePhaseTimers() {
     if(onlineRankingAutoCloseTimer) clearTimeout(onlineRankingAutoCloseTimer);
     if(onlineRankingCountdownTimer) clearInterval(onlineRankingCountdownTimer);
     if(onlineHalftimePollingTimer) clearInterval(onlineHalftimePollingTimer);
+    if(onlineReactionPollTimer) clearInterval(onlineReactionPollTimer);
 
     onlineFormationTimer = null;
     onlineGoalTimer = null;
@@ -1414,6 +1534,7 @@ function clearOnlinePhaseTimers() {
     onlineRankingAutoCloseTimer = null;
     onlineRankingCountdownTimer = null;
     onlineHalftimePollingTimer = null;
+    onlineReactionPollTimer = null;
 }
 
 function resetOnlineGameplaySyncState() {
@@ -1438,6 +1559,8 @@ function resetOnlineGameplaySyncState() {
     onlineRemoteVisualPlayback = false;
     hideOnlinePhaseTimer();
     hideOnlineReconnectOverlay();
+    onlineLastReactionId = 0;
+
 }
 
 function showOnlinePhaseTimer(label, remainingMs) {
@@ -2133,6 +2256,7 @@ function startOnlineGamePolling() {
     if(onlineGamePollingTimer) clearInterval(onlineGamePollingTimer);
     pollOnlineGameState();
     onlineGamePollingTimer = setInterval(pollOnlineGameState, ONLINE_GAME_POLL_MS);
+    startOnlineReactionPolling();
 }
 
 // Durante lobby/formação/roleta esta chamada serve apenas como heartbeat.
@@ -2275,6 +2399,63 @@ async function onlineRpc(functionName, payload) {
 
     const data = await response.json();
     return Array.isArray(data) ? data[0] : data;
+}
+
+async function onlineRpcRows(functionName, payload) {
+    const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/${functionName}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "apikey": SUPABASE_PUBLISHABLE_KEY
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    if(!response.ok) {
+        let detail = "";
+        try {
+            const errorPayload = await response.json();
+            detail = errorPayload?.message || errorPayload?.details || "";
+        } catch(error) {}
+        throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+}
+
+async function pollOnlineReactions() {
+    if(!isOnlineMode() || !onlineLobbyState.roomCode || onlineLobbyState.roomStatus !== "playing") return;
+
+    try {
+        const rows = await onlineRpcRows("cardbol_online_get_reactions", {
+            ...getOnlineSessionPayload(),
+            p_room_code: onlineLobbyState.roomCode,
+            p_after_id: onlineLastReactionId
+        });
+
+        rows.forEach(row => {
+            const reactionId = Number(row.reaction_id) || 0;
+            onlineLastReactionId = Math.max(onlineLastReactionId, reactionId);
+
+            if(String(row.player_id || "") === String(currentUserIdentity.playerId || "")) return;
+
+            const side = Number(row.player_side) === 1 ? 1 : 0;
+            showPlayerScoreReaction(side, String(row.emoji || ""));
+        });
+    } catch(error) {
+        console.warn("CardBol online reaction poll:", error);
+    }
+}
+
+function startOnlineReactionPolling() {
+    if(onlineReactionPollTimer) clearInterval(onlineReactionPollTimer);
+    pollOnlineReactions();
+    onlineReactionPollTimer = setInterval(pollOnlineReactions, 900);
 }
 
 function getOnlineSessionPayload() {
@@ -10933,6 +11114,7 @@ function updateInterface() {
     updateScoreboard();
     updateCatimbaTeamIndicators();
     updateClockDisplays();
+    updateReactionControlVisibility();
 
     const turn = document.getElementById("turnText");
     const blue = document.getElementById("bluePlayer");
@@ -11235,6 +11417,9 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
             // gravado para os DOIS perfis em uma etapa específica do ranking
             // online, evitando contabilização duplicada por dois navegadores.
             setRankingSaveStatus("🌐 Partida online finalizada • validação do ranking online em fase beta.", "pending");
+            setTimeout(() => {
+                if(winner !== null && !rankingOverlayOpen) openRankingOverlay("postgame");
+            }, 900);
         } else {
             registerOfficialMatchToRanking(scoringPlayer);
         }

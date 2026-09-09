@@ -255,7 +255,7 @@
         <button
             class="game-mode-ranking-button"
             type="button"
-            onclick="openRankingOverlay()"
+            onclick="openRankingOverlay('manual')"
         >
             🏆 VER RANKING
         </button>
@@ -457,6 +457,26 @@
 
 <div id="gameRoot" class="game-container">
 
+    <div id="reactionControl" class="reaction-control" aria-hidden="true">
+        <button
+            id="reactionToggleButton"
+            class="reaction-toggle-button"
+            type="button"
+            onclick="toggleReactionMenu()"
+            aria-label="Enviar reação"
+            aria-expanded="false"
+        >💬</button>
+
+        <div id="reactionMenu" class="reaction-menu" aria-hidden="true">
+            <button type="button" onclick="sendPlayerReaction('😂')" aria-label="Rir">😂</button>
+            <button type="button" onclick="sendPlayerReaction('🤣')" aria-label="Gargalhar">🤣</button>
+            <button type="button" onclick="sendPlayerReaction('😜')" aria-label="Zoar">😜</button>
+            <button type="button" onclick="sendPlayerReaction('😡')" aria-label="Raiva">😡</button>
+            <button type="button" onclick="sendPlayerReaction('🤬')" aria-label="Fúria">🤬</button>
+            <button type="button" onclick="sendPlayerReaction('😤')" aria-label="Irritado">😤</button>
+        </div>
+    </div>
+
     <div class="game-header">
 
         <div class="brand-panel">
@@ -471,11 +491,13 @@
                 <div class="score-display">
                     <span class="score-team score-team-barcelona" title="Barcelona">
                         <img id="redScoreLogo" class="score-club-logo" src="imagens/clubes/barcelona/logo.png" alt="Escudo do Barcelona">
+                        <span id="redPlayerReactionEmoji" class="player-score-reaction" aria-hidden="true"></span>
                         <span id="redScore" class="score-number red-score">0</span>
                     </span>
                     <span class="score-separator">×</span>
                     <span class="score-team score-team-madrid" title="Real Madrid">
                         <span id="blueScore" class="score-number blue-score">0</span>
+                        <span id="bluePlayerReactionEmoji" class="player-score-reaction" aria-hidden="true"></span>
                         <span id="cpuScoreMoodEmoji" class="cpu-score-mood" aria-hidden="true"></span>
                         <img id="blueScoreLogo" class="score-club-logo" src="imagens/clubes/real-madrid/logo.png" alt="Escudo do Real Madrid">
                     </span>
@@ -590,7 +612,7 @@
         <div id="message" class="message">⚙️ Defina a formação inicial.</div>
         <button id="formationConfirmButton" class="formation-confirm-button red-formation" type="button" onclick="confirmFormation()">✓ CONFIRMAR BARCELONA</button>
         <button id="fullscreenButton" class="fullscreen-button" type="button" onclick="toggleFullscreen()" aria-pressed="false">⛶ TELA CHEIA</button>
-        <button id="rankingGameButton" class="ranking-game-button" type="button" onclick="openRankingOverlay()">🏆 RANKING</button>
+        <button id="rankingGameButton" class="ranking-game-button" type="button" onclick="openRankingOverlay('manual')">🏆 RANKING</button>
         <button class="new-game" onclick="newGame()">↻ REINICIAR 0 × 0</button>
     </div>
 
@@ -774,7 +796,7 @@
             id="victoryRankingButton"
             class="victory-ranking-button"
             type="button"
-            onclick="openRankingOverlay()"
+            onclick="openRankingOverlay('manual')"
         >
             🏆 VER RANKING
         </button>

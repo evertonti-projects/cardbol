@@ -788,7 +788,9 @@ let currentUserIdentity = {
     playerId: null,
     username: "",
     loginStatus: "",
-    sessionToken: ""
+    sessionToken: "",
+    wins: 0,
+    levelKey: "rookie"
 };
 
 let playerIdentitySubmitting = false;
@@ -893,8 +895,51 @@ function escapeRankingText(value) {
         .replace(/'/g, "&#039;");
 }
 
-async function requestCardBolRanking(limit = 100) {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_ranking`, {
+const RANKING_LEVELS = {
+    rookie: { label: "INICIANTE", minWins: 0, maxWins: 19, nextWins: 20 },
+    level1: { label: "NÍVEL 1", minWins: 20, maxWins: 49, nextWins: 50 },
+    level2: { label: "NÍVEL 2", minWins: 50, maxWins: 124, nextWins: 125 },
+    level3: { label: "NÍVEL 3", minWins: 125, maxWins: null, nextWins: null }
+};
+
+let currentRankingLevelFilter = "rookie";
+
+function getRankingLevelKeyByWins(winsValue) {
+    const wins = Math.max(0, Number(winsValue) || 0);
+    if(wins >= 125) return "level3";
+    if(wins >= 50) return "level2";
+    if(wins >= 20) return "level1";
+    return "rookie";
+}
+
+function getRankingLevelLabel(levelKey) {
+    return RANKING_LEVELS[levelKey]?.label || "INICIANTE";
+}
+
+function applyPlayerLevelTheme(winsValue) {
+    const wins = Math.max(0, Number(winsValue) || 0);
+    const levelKey = getRankingLevelKeyByWins(wins);
+    const root = document.getElementById("gameRoot");
+
+    currentUserIdentity.wins = wins;
+    currentUserIdentity.levelKey = levelKey;
+
+    document.body.classList.remove("cardbol-level-rookie", "cardbol-level-1", "cardbol-level-2", "cardbol-level-3");
+    const bodyLevelClass = levelKey === "rookie" ? "cardbol-level-rookie" : `cardbol-level-${levelKey.replace("level", "")}`;
+    document.body.classList.add(bodyLevelClass);
+
+    if(root) {
+        root.classList.remove("level-theme-rookie", "level-theme-1", "level-theme-2", "level-theme-3");
+        const suffix = levelKey === "rookie" ? "rookie" : levelKey.replace("level", "");
+        root.classList.add(`level-theme-${suffix}`);
+        root.setAttribute("data-player-level", getRankingLevelLabel(levelKey));
+    }
+}
+
+async function requestCardBolPlayerProgress() {
+    if(!currentUserIdentity.playerId || !currentUserIdentity.sessionToken) return null;
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_player_progress`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -902,13 +947,76 @@ async function requestCardBolRanking(limit = 100) {
             "apikey": SUPABASE_PUBLISHABLE_KEY
         },
         body: JSON.stringify({
+            p_player_id: currentUserIdentity.playerId,
+            p_session_token: currentUserIdentity.sessionToken
+        })
+    });
+
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    return Array.isArray(payload) ? payload[0] : payload;
+}
+
+async function refreshPlayerLevelTheme() {
+    try {
+        const progress = await requestCardBolPlayerProgress();
+        if(progress?.success === true) {
+            applyPlayerLevelTheme(progress.wins);
+        }
+    } catch(error) {
+        console.warn("CardBol player level:", error);
+    }
+}
+
+function updateRankingLevelUI() {
+    document.querySelectorAll(".ranking-level-tab").forEach(button => {
+        const active = button.dataset.level === currentRankingLevelFilter;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    const info = document.getElementById("rankingLevelInfo");
+    if(!info) return;
+
+    const config = RANKING_LEVELS[currentRankingLevelFilter] || RANKING_LEVELS.rookie;
+    const ownLevel = currentUserIdentity.levelKey === currentRankingLevelFilter;
+    let text = `${config.label} • ${config.maxWins === null ? `${config.minWins}+ vitórias` : `${config.minWins}–${config.maxWins} vitórias`}`;
+
+    if(ownLevel) {
+        if(config.nextWins) {
+            const remaining = Math.max(0, config.nextWins - (Number(currentUserIdentity.wins) || 0));
+            text += ` • VOCÊ: ${currentUserIdentity.wins} V • faltam ${remaining} para o próximo nível`;
+        } else {
+            text += ` • VOCÊ: ${currentUserIdentity.wins} V • nível máximo atual`;
+        }
+    }
+
+    info.textContent = text;
+}
+
+function setRankingLevelFilter(levelKey) {
+    if(!RANKING_LEVELS[levelKey] || currentRankingLevelFilter === levelKey) return;
+    currentRankingLevelFilter = levelKey;
+    updateRankingLevelUI();
+    loadRankingData();
+}
+
+async function requestCardBolRanking(levelKey = currentRankingLevelFilter, limit = 100) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cardbol_ranking_level`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_PUBLISHABLE_KEY
+        },
+        body: JSON.stringify({
+            p_level: levelKey,
             p_limit: Math.max(1, Math.min(Number(limit) || 100, 500))
         })
     });
 
     if(!response.ok) {
         let detail = "";
-
         try {
             const errorPayload = await response.json();
             const parts = [
@@ -917,12 +1025,8 @@ async function requestCardBolRanking(limit = 100) {
                 errorPayload?.hint,
                 errorPayload?.code ? `código ${errorPayload.code}` : ""
             ].filter(Boolean);
-
             detail = parts.join(" • ");
-        } catch(error) {
-            // Usa status HTTP abaixo.
-        }
-
+        } catch(error) {}
         throw new Error(detail || `HTTP ${response.status}`);
     }
 
@@ -996,11 +1100,15 @@ async function loadRankingData() {
         error.style.display = "none";
         error.textContent = "";
     }
-    if(empty) empty.style.display = "none";
+    if(empty) {
+        empty.style.display = "none";
+        empty.textContent = `Ainda não há jogadores classificados em ${getRankingLevelLabel(currentRankingLevelFilter)}.`;
+    }
     if(tableWrap) tableWrap.style.display = "none";
+    updateRankingLevelUI();
 
     try {
-        const rows = await requestCardBolRanking(100);
+        const rows = await requestCardBolRanking(currentRankingLevelFilter, 100);
 
         if(requestId !== rankingRequestSequence) return;
 
@@ -1036,6 +1144,9 @@ function openRankingOverlay(openMode = "manual") {
 
     const postgame = openMode === "postgame";
     const limitMs = postgame ? RANKING_POSTGAME_LIMIT_MS : RANKING_MANUAL_LIMIT_MS;
+
+    currentRankingLevelFilter = currentUserIdentity.levelKey || getRankingLevelKeyByWins(currentUserIdentity.wins);
+    updateRankingLevelUI();
 
     rankingOverlayOpen = true;
     overlay.classList.add("show");
@@ -1235,6 +1346,12 @@ async function registerOfficialMatchToRanking(winningPlayer) {
 
         const pointsLabel = pointsDelta > 0 ? `+${pointsDelta}` : `${pointsDelta}`;
 
+        if(Number.isFinite(Number(result.total_wins))) {
+            applyPlayerLevelTheme(Number(result.total_wins));
+        } else {
+            refreshPlayerLevelTheme();
+        }
+
         setRankingSaveStatus(
             `✓ Resultado registrado no ranking • ${pointsLabel} pt${Math.abs(pointsDelta) === 1 ? "" : "s"}`,
             "success"
@@ -1322,8 +1439,12 @@ async function submitPlayerIdentity(event) {
             playerId: result.player_id || null,
             username: result.username || username,
             loginStatus: result.status || "LOGIN",
-            sessionToken: result.session_token || ""
+            sessionToken: result.session_token || "",
+            wins: 0,
+            levelKey: "rookie"
         };
+
+        await refreshPlayerLevelTheme();
 
         // O PIN deixa de existir no formulário assim que o servidor confirma.
         if(pinInput) pinInput.value = "";

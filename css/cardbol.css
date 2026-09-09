@@ -6016,4 +6016,293 @@ button.bench-carousel-item:hover {
         width: 16px !important;
     }
 }
-\n\n/* =========================================================\n   REAÇÕES DO JOGADOR — CPU / MULTIPLAYER\n========================================================= */\n.game-container { position: relative; }\n\n.reaction-control {\n    position: fixed;\n    top: max(9px, env(safe-area-inset-top));\n    right: max(9px, env(safe-area-inset-right));\n    z-index: 7350;\n    display: none;\n    align-items: flex-start;\n    gap: 6px;\n}\n\n.reaction-control.show { display: flex; }\n\n.reaction-toggle-button {\n    width: 35px;\n    height: 35px;\n    border: 1px solid rgba(255,255,255,.24);\n    border-radius: 50%;\n    background: rgba(7,12,18,.86);\n    color: #fff;\n    font-size: 17px;\n    cursor: pointer;\n    box-shadow: 0 6px 18px rgba(0,0,0,.42);\n    backdrop-filter: blur(7px);\n}\n\n.reaction-menu {\n    display: none;\n    grid-template-columns: repeat(3, 34px);\n    gap: 5px;\n    padding: 6px;\n    border: 1px solid rgba(255,255,255,.18);\n    border-radius: 12px;\n    background: rgba(7,12,18,.94);\n    box-shadow: 0 10px 28px rgba(0,0,0,.48);\n    backdrop-filter: blur(8px);\n}\n\n.reaction-menu.show { display: grid; }\n\n.reaction-menu button {\n    width: 34px;\n    height: 34px;\n    border: 1px solid rgba(255,255,255,.12);\n    border-radius: 9px;\n    background: rgba(255,255,255,.07);\n    font-size: 20px;\n    line-height: 1;\n    cursor: pointer;\n    transition: transform .12s ease, background .12s ease;\n}\n\n.reaction-menu button:hover {\n    transform: scale(1.12);\n    background: rgba(255,255,255,.14);\n}\n\n.player-score-reaction {\n    display: none;\n    width: 0;\n    opacity: 0;\n    pointer-events: none;\n    user-select: none;\n    font-size: 22px;\n    line-height: 1;\n    transform-origin: center;\n    filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));\n}\n\n.player-score-reaction.show {\n    display: inline-flex;\n    width: 26px;\n    align-items: center;\n    justify-content: center;\n    opacity: 1;\n}\n\n.player-score-reaction.taunt { text-shadow: 0 0 9px rgba(250,204,21,.48); }\n.player-score-reaction.anger { text-shadow: 0 0 10px rgba(239,68,68,.52); }\n.player-score-reaction.mood-bounce { animation: cpuMoodBounce .72s ease-in-out infinite; }\n.player-score-reaction.mood-spin { animation: cpuMoodSpin 1.05s ease-in-out infinite; }\n.player-score-reaction.mood-wiggle { animation: cpuMoodWiggle .58s ease-in-out infinite; }\n.player-score-reaction.mood-shake { animation: cpuMoodShake .24s linear infinite; }\n.player-score-reaction.mood-pulse { animation: cpuMoodPulse .62s ease-in-out infinite; }\n.player-score-reaction.mood-stomp { animation: cpuMoodStomp .48s ease-in-out infinite; }\n\n@media (max-width:900px) {\n    .reaction-toggle-button { width:30px; height:30px; font-size:14px; }\n    .reaction-menu { grid-template-columns:repeat(3,29px); gap:4px; padding:5px; }\n    .reaction-menu button { width:29px; height:29px; font-size:17px; }\n    .player-score-reaction { font-size:17px; }\n    .player-score-reaction.show { width:20px; }\n}\n\n@media (orientation:landscape) and (max-height:650px) {\n    .reaction-control { top:max(5px,env(safe-area-inset-top)); right:max(5px,env(safe-area-inset-right)); }\n    .reaction-toggle-button { width:25px; height:25px; font-size:12px; }\n    .reaction-menu { grid-template-columns:repeat(6,24px); gap:3px; padding:4px; border-radius:8px; }\n    .reaction-menu button { width:24px; height:24px; font-size:14px; border-radius:6px; }\n    .player-score-reaction { font-size:14px !important; }\n    .player-score-reaction.show { width:16px !important; }\n}\n
+
+
+/* =========================================================
+   REAÇÕES DO JOGADOR — CPU / MULTIPLAYER
+========================================================= */
+.game-container { position: relative; }
+
+.reaction-control {
+    position: fixed;
+    top: max(9px, env(safe-area-inset-top));
+    right: max(9px, env(safe-area-inset-right));
+    z-index: 7350;
+    display: none;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.reaction-control.show { display: flex; }
+
+.reaction-toggle-button {
+    width: 35px;
+    height: 35px;
+    border: 1px solid rgba(255,255,255,.24);
+    border-radius: 50%;
+    background: rgba(7,12,18,.86);
+    color: #fff;
+    font-size: 17px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.42);
+    backdrop-filter: blur(7px);
+}
+
+.reaction-menu {
+    display: none;
+    grid-template-columns: repeat(3, 34px);
+    gap: 5px;
+    padding: 6px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: rgba(7,12,18,.94);
+    box-shadow: 0 10px 28px rgba(0,0,0,.48);
+    backdrop-filter: blur(8px);
+}
+
+.reaction-menu.show { display: grid; }
+
+.reaction-menu button {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 9px;
+    background: rgba(255,255,255,.07);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform .12s ease, background .12s ease;
+}
+
+.reaction-menu button:hover {
+    transform: scale(1.12);
+    background: rgba(255,255,255,.14);
+}
+
+.player-score-reaction {
+    display: none;
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    font-size: 22px;
+    line-height: 1;
+    transform-origin: center;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.55));
+}
+
+.player-score-reaction.show {
+    display: inline-flex;
+    width: 26px;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+}
+
+.player-score-reaction.taunt { text-shadow: 0 0 9px rgba(250,204,21,.48); }
+.player-score-reaction.anger { text-shadow: 0 0 10px rgba(239,68,68,.52); }
+.player-score-reaction.mood-bounce { animation: cpuMoodBounce .72s ease-in-out infinite; }
+.player-score-reaction.mood-spin { animation: cpuMoodSpin 1.05s ease-in-out infinite; }
+.player-score-reaction.mood-wiggle { animation: cpuMoodWiggle .58s ease-in-out infinite; }
+.player-score-reaction.mood-shake { animation: cpuMoodShake .24s linear infinite; }
+.player-score-reaction.mood-pulse { animation: cpuMoodPulse .62s ease-in-out infinite; }
+.player-score-reaction.mood-stomp { animation: cpuMoodStomp .48s ease-in-out infinite; }
+
+@media (max-width:900px) {
+    .reaction-toggle-button { width:30px; height:30px; font-size:14px; }
+    .reaction-menu { grid-template-columns:repeat(3,29px); gap:4px; padding:5px; }
+    .reaction-menu button { width:29px; height:29px; font-size:17px; }
+    .player-score-reaction { font-size:17px; }
+    .player-score-reaction.show { width:20px; }
+}
+
+@media (orientation:landscape) and (max-height:650px) {
+    .reaction-control { top:max(5px,env(safe-area-inset-top)); right:max(5px,env(safe-area-inset-right)); }
+    .reaction-toggle-button { width:25px; height:25px; font-size:12px; }
+    .reaction-menu { grid-template-columns:repeat(6,24px); gap:3px; padding:4px; border-radius:8px; }
+    .reaction-menu button { width:24px; height:24px; font-size:14px; border-radius:6px; }
+    .player-score-reaction { font-size:14px !important; }
+    .player-score-reaction.show { width:16px !important; }
+}
+
+/* =========================================================
+   REAÇÕES — CONTROLE FLUTUANTE (não ocupa espaço no layout)
+========================================================= */
+.reaction-control,
+.reaction-control.show {
+    position: fixed !important;
+    top: max(10px, env(safe-area-inset-top)) !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
+    z-index: 12050 !important;
+    width: 36px !important;
+    height: 36px !important;
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none;
+}
+
+.reaction-control.show {
+    display: block !important;
+}
+
+.reaction-toggle-button {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 36px !important;
+    height: 36px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+.reaction-menu {
+    position: absolute !important;
+    top: 0 !important;
+    right: calc(100% + 7px) !important;
+    width: auto !important;
+    margin: 0 !important;
+    pointer-events: auto;
+}
+
+.reaction-menu:not(.show) {
+    display: none !important;
+}
+
+.reaction-menu.show {
+    display: grid !important;
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+    .reaction-control,
+    .reaction-control.show {
+        top: max(5px, env(safe-area-inset-top)) !important;
+        right: max(5px, env(safe-area-inset-right)) !important;
+        width: 27px !important;
+        height: 27px !important;
+    }
+    .reaction-toggle-button {
+        width: 27px !important;
+        height: 27px !important;
+    }
+    .reaction-menu {
+        right: calc(100% + 4px) !important;
+    }
+}
+
+/* =========================================================
+   RANKING POR NÍVEIS
+========================================================= */
+.ranking-level-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 9px 14px 3px;
+}
+
+.ranking-level-tab {
+    min-height: 42px;
+    padding: 6px 5px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 10px;
+    background: rgba(30,41,59,.58);
+    color: #cbd5e1;
+    font-family: inherit;
+    font-size: 9px;
+    line-height: 1.05;
+    font-weight: 1000;
+    cursor: pointer;
+}
+.ranking-level-tab small { font-size: 6px; opacity: .72; }
+.ranking-level-tab.active {
+    color: #fff;
+    border-color: rgba(250,204,21,.58);
+    background: linear-gradient(145deg, rgba(133,77,14,.74), rgba(69,26,3,.72));
+    box-shadow: 0 0 16px rgba(250,204,21,.12);
+}
+.ranking-level-tab[data-level="level2"].active {
+    border-color: rgba(216,180,254,.72);
+    background: linear-gradient(145deg, rgba(107,33,168,.88), rgba(76,29,149,.82));
+    box-shadow: 0 0 18px rgba(192,132,252,.23);
+}
+.ranking-level-tab[data-level="level3"].active {
+    color: #fff7cc;
+    border-color: rgba(253,224,71,.82);
+    background: linear-gradient(145deg, rgba(180,83,9,.92), rgba(113,63,18,.88));
+    box-shadow: 0 0 18px rgba(250,204,21,.26);
+}
+.ranking-level-info {
+    min-height: 24px;
+    padding: 5px 14px 7px;
+    color: #94a3b8;
+    text-align: center;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+/* =========================================================
+   PRESTÍGIO VISUAL DO JOGADOR
+   Nível 1 mantém o visual original.
+========================================================= */
+body.cardbol-level-2 {
+    background: radial-gradient(circle at 50% -10%, #5b21b6 0%, #251044 37%, #08050f 80%);
+}
+.game-container.level-theme-2 {
+    --panel: rgba(91,33,182,.19);
+    --panel-border: rgba(216,180,254,.30);
+    --green-light: #e9d5ff;
+}
+.game-container.level-theme-2 .pitch-shell {
+    background: linear-gradient(135deg, #4c1d95, #7e22ce) !important;
+    border-color: #d8b4fe !important;
+    box-shadow: 0 0 18px rgba(192,132,252,.55), 0 18px 48px rgba(0,0,0,.58) !important;
+}
+.game-container.level-theme-2 .cell.check-light { background: rgba(109,40,217,.90) !important; }
+.game-container.level-theme-2 .cell.check-dark { background: rgba(67,25,114,.94) !important; }
+.game-container.level-theme-2 .electronic-scoreboard {
+    border-color: rgba(216,180,254,.48);
+    box-shadow: inset 0 0 18px rgba(88,28,135,.62), 0 0 14px rgba(192,132,252,.22);
+}
+.game-container.level-theme-2 .brand-panel,
+.game-container.level-theme-2 .top-panel,
+.game-container.level-theme-2 .dice-area,
+.game-container.level-theme-2 .info-panel,
+.game-container.level-theme-2 .bottom-panel {
+    box-shadow: inset 0 0 16px rgba(126,34,206,.11), 0 0 10px rgba(126,34,206,.08);
+}
+
+body.cardbol-level-3 {
+    background: radial-gradient(circle at 50% -10%, #b45309 0%, #422006 39%, #0d0903 82%);
+}
+.game-container.level-theme-3 {
+    --panel: rgba(146,64,14,.20);
+    --panel-border: rgba(253,224,71,.34);
+    --green-light: #fef08a;
+}
+.game-container.level-theme-3 .pitch-shell {
+    background: linear-gradient(135deg, #78350f, #d97706) !important;
+    border-color: #fde68a !important;
+    box-shadow: 0 0 20px rgba(250,204,21,.56), 0 18px 50px rgba(0,0,0,.60) !important;
+}
+.game-container.level-theme-3 .cell.check-light { background: rgba(202,138,4,.90) !important; }
+.game-container.level-theme-3 .cell.check-dark { background: rgba(120,53,15,.94) !important; }
+.game-container.level-theme-3 .electronic-scoreboard {
+    border-color: rgba(253,224,71,.52);
+    box-shadow: inset 0 0 18px rgba(146,64,14,.65), 0 0 15px rgba(250,204,21,.24);
+}
+.game-container.level-theme-3 .brand-panel,
+.game-container.level-theme-3 .top-panel,
+.game-container.level-theme-3 .dice-area,
+.game-container.level-theme-3 .info-panel,
+.game-container.level-theme-3 .bottom-panel {
+    box-shadow: inset 0 0 16px rgba(217,119,6,.12), 0 0 11px rgba(250,204,21,.09);
+}
+
+@media (orientation: landscape) and (max-height: 650px) {
+    .ranking-level-tabs { gap:3px; padding:5px 8px 2px; }
+    .ranking-level-tab { min-height:27px; padding:3px 2px; border-radius:6px; font-size:6px; }
+    .ranking-level-tab small { font-size:4px; }
+    .ranking-level-info { min-height:14px; padding:2px 8px 4px; font-size:5px; }
+}
+\n\n/* =========================================================\n   REAÇÕES — OVERLAY TOTALMENTE FORA DO LAYOUT DO JOGO\n========================================================= */\nbody > .reaction-control,\nbody > .reaction-control.show {\n    position: fixed !important;\n    inset: auto max(10px, env(safe-area-inset-right)) auto auto !important;\n    top: max(10px, env(safe-area-inset-top)) !important;\n    width: 38px !important;\n    height: 38px !important;\n    min-width: 0 !important;\n    min-height: 0 !important;\n    max-width: 38px !important;\n    max-height: 38px !important;\n    margin: 0 !important;\n    padding: 0 !important;\n    border: 0 !important;\n    z-index: 30000 !important;\n    overflow: visible !important;\n    pointer-events: none !important;\n    contain: layout style !important;\n}\n\nbody > .reaction-control {\n    display: none !important;\n}\n\nbody > .reaction-control.show {\n    display: block !important;\n}\n\nbody > .reaction-control .reaction-toggle-button {\n    position: absolute !important;\n    top: 0 !important;\n    right: 0 !important;\n    width: 38px !important;\n    height: 38px !important;\n    min-width: 38px !important;\n    min-height: 38px !important;\n    margin: 0 !important;\n    padding: 0 !important;\n    display: flex !important;\n    align-items: center !important;\n    justify-content: center !important;\n    pointer-events: auto !important;\n}\n\nbody > .reaction-control .reaction-menu {\n    position: absolute !important;\n    top: 0 !important;\n    right: 46px !important;\n    width: max-content !important;\n    height: auto !important;\n    margin: 0 !important;\n    padding: 6px !important;\n    grid-template-columns: repeat(6, 34px) !important;\n    gap: 5px !important;\n    pointer-events: auto !important;\n    transform-origin: right center;\n}\n\nbody > .reaction-control .reaction-menu:not(.show) {\n    display: none !important;\n}\n\nbody > .reaction-control .reaction-menu.show {\n    display: grid !important;\n    animation: reactionMenuExpand .16s ease-out both;\n}\n\n@keyframes reactionMenuExpand {\n    from { opacity: 0; transform: translateX(8px) scale(.94); }\n    to   { opacity: 1; transform: translateX(0) scale(1); }\n}\n\n@media (orientation: landscape) and (max-height: 650px) {\n    body > .reaction-control,\n    body > .reaction-control.show {\n        top: max(5px, env(safe-area-inset-top)) !important;\n        right: max(5px, env(safe-area-inset-right)) !important;\n        width: 28px !important;\n        height: 28px !important;\n        max-width: 28px !important;\n        max-height: 28px !important;\n    }\n\n    body > .reaction-control .reaction-toggle-button {\n        width: 28px !important;\n        height: 28px !important;\n        min-width: 28px !important;\n        min-height: 28px !important;\n        font-size: 13px !important;\n    }\n\n    body > .reaction-control .reaction-menu {\n        right: 34px !important;\n        grid-template-columns: repeat(6, 25px) !important;\n        gap: 3px !important;\n        padding: 4px !important;\n    }\n\n    body > .reaction-control .reaction-menu button {\n        width: 25px !important;\n        height: 25px !important;\n        font-size: 14px !important;\n    }\n}\n

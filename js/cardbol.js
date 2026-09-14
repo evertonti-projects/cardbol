@@ -525,6 +525,16 @@ let cpuManageResultDelayApplied = false;
 let cpuManageResultDelayMs = 0;
 let cpuMoodDecisionMade = false;
 let cpuMoodTimer = null;
+let cpuCeraCountdownTimer = null;
+let cpuCeraEndsAt = 0;
+
+// Memória tática do ataque humano dentro da própria partida.
+// A CPU começa a reagir depois de detectar a mesma rota pelo menos 2 vezes.
+let cpuHumanAttackMemory = {
+    lanes: { left: 0, center: 0, right: 0 },
+    diagonals: { left: 0, right: 0 },
+    totalForwardAttacks: 0
+};
 
 // ------------------------------------------------------------
 // REAÇÕES DO JOGADOR — CPU / 1×1 ONLINE
@@ -672,6 +682,46 @@ function cpuCanManageResultNow() {
     return lateFirstHalf || secondHalf;
 }
 
+function clearCpuCeraCountdown() {
+    if(cpuCeraCountdownTimer) {
+        clearInterval(cpuCeraCountdownTimer);
+        cpuCeraCountdownTimer = null;
+    }
+
+    cpuCeraEndsAt = 0;
+
+    const element = document.getElementById("cpuCeraStatus");
+    if(!element) return;
+
+    element.textContent = "";
+    element.classList.remove("show");
+    element.setAttribute("aria-hidden", "true");
+}
+
+function startCpuCeraCountdown(durationMs) {
+    clearCpuCeraCountdown();
+
+    const element = document.getElementById("cpuCeraStatus");
+    if(!element || !isCpuMode()) return;
+
+    cpuCeraEndsAt = Date.now() + Math.max(0, durationMs);
+
+    const refresh = () => {
+        const remaining = Math.max(0, Math.ceil((cpuCeraEndsAt - Date.now()) / 1000));
+
+        element.textContent = `😜 FAZENDO CERA... ${remaining}s`;
+        element.classList.add("show");
+        element.setAttribute("aria-hidden", "false");
+
+        if(remaining <= 0) {
+            clearCpuCeraCountdown();
+        }
+    };
+
+    refresh();
+    cpuCeraCountdownTimer = setInterval(refresh, 250);
+}
+
 function clearCpuMoodEmoji() {
     if(cpuMoodTimer) {
         clearTimeout(cpuMoodTimer);
@@ -731,6 +781,7 @@ function cpuResetManageResultTurnState() {
     cpuManageResultDelayMs = 0;
     cpuMoodDecisionMade = false;
     clearCpuMoodEmoji();
+    clearCpuCeraCountdown();
 }
 
 function cpuPrepareManageResultForTurn() {
@@ -3738,6 +3789,206 @@ function cpuIsGoalTarget(player,target) {
     );
 }
 
+function cpuScoreDeficit() {
+    return Math.max(0, scoreRed - scoreBlue);
+}
+
+function cpuIsComebackMode() {
+    return isCpuMode() && cpuScoreDeficit() >= 2 && winner === null;
+}
+
+function cpuAttackLaneKey(col) {
+    if(col <= 3) return "left";
+    if(col >= 7) return "right";
+    return "center";
+}
+
+function cpuAttackLaneCenter(lane) {
+    if(lane === "left") return 2;
+    if(lane === "right") return 8;
+    return 5;
+}
+
+function cpuResetHumanAttackMemory() {
+    cpuHumanAttackMemory = {
+        lanes: { left: 0, center: 0, right: 0 },
+        diagonals: { left: 0, right: 0 },
+        totalForwardAttacks: 0
+    };
+}
+
+function cpuRecordHumanAttackMovement(piece, fromRow, fromCol, toRow, toCol) {
+    if(
+        !isCpuMode() ||
+        !piece ||
+        piece.player !== HUMAN_PLAYER ||
+        winner !== null
+    ) return;
+
+    const forwardSteps = toRow - fromRow;
+
+    // Só aprende movimentos que realmente avançam em direção ao gol da CPU
+    // e já alcançaram a metade ofensiva do jogador.
+    if(forwardSteps <= 0 || toRow < Math.floor(ROWS / 2)) return;
+
+    const lane = cpuAttackLaneKey(toCol);
+    cpuHumanAttackMemory.lanes[lane] = Math.min(
+        9,
+        (cpuHumanAttackMemory.lanes[lane] || 0) + 1
+    );
+    cpuHumanAttackMemory.totalForwardAttacks += 1;
+
+    const dr = Math.abs(toRow - fromRow);
+    const dc = Math.abs(toCol - fromCol);
+
+    if(dr > 0 && dr === dc) {
+        const diagonal = toCol < fromCol ? "left" : "right";
+        cpuHumanAttackMemory.diagonals[diagonal] = Math.min(
+            9,
+            (cpuHumanAttackMemory.diagonals[diagonal] || 0) + 1
+        );
+    }
+}
+
+function cpuLearnedRoutePressureForCol(col) {
+    const lane = cpuAttackLaneKey(col);
+    const laneCount = cpuHumanAttackMemory.lanes[lane] || 0;
+
+    // A CPU só considera que "aprendeu" uma rota depois da segunda ocorrência.
+    if(laneCount < 2) return 0;
+
+    return (laneCount - 1) * 18;
+}
+
+function cpuLearnedDefenseCoverageScore() {
+    if(!isCpuMode()) return 0;
+
+    const defenders = pieces.filter(piece =>
+        piece.player === CPU_PLAYER &&
+        ["ZG","LE","LD","ME","MD"].includes(piece.role) &&
+        piece.row >= 9
+    );
+
+    let score = 0;
+
+    for(const lane of ["left","center","right"]) {
+        const count = cpuHumanAttackMemory.lanes[lane] || 0;
+        if(count < 2) continue;
+
+        const laneCol = cpuAttackLaneCenter(lane);
+        let nearest = 99;
+
+        for(const defender of defenders) {
+            nearest = Math.min(nearest, Math.abs(defender.col - laneCol));
+        }
+
+        score += Math.max(0, 5 - nearest) * (count - 1) * 8;
+    }
+
+    // Se o humano insiste em diagonais, a CPU valoriza cobertura lateral
+    // de ambos os lados do corredor central.
+    for(const diagonal of ["left","right"]) {
+        const count = cpuHumanAttackMemory.diagonals[diagonal] || 0;
+        if(count < 2) continue;
+
+        const desiredCol = diagonal === "left" ? 4 : 6;
+        let nearest = 99;
+
+        for(const defender of defenders) {
+            nearest = Math.min(nearest, Math.abs(defender.col - desiredCol));
+        }
+
+        score += Math.max(0, 4 - nearest) * (count - 1) * 10;
+    }
+
+    return score;
+}
+
+function cpuHumanImmediateThreatProfile(piece) {
+    if(!piece || piece.player !== HUMAN_PLAYER) {
+        return { risk:0, goalDistance:null, finalZone:false, lane:"center" };
+    }
+
+    let goalDistance = null;
+
+    // Procura a menor distância legal em linha reta até uma das 3 entradas do gol.
+    for(const goalCol of goalColumns) {
+        const requiredDistance = Math.max(
+            Math.abs(ROWS - piece.row),
+            Math.abs(goalCol - piece.col)
+        );
+
+        if(requiredDistance < 1 || requiredDistance > 6) continue;
+
+        if(
+            isValidMoveForDistance(
+                piece,
+                ROWS,
+                goalCol,
+                requiredDistance
+            )
+        ) {
+            if(goalDistance === null || requiredDistance < goalDistance) {
+                goalDistance = requiredDistance;
+            }
+        }
+    }
+
+    const finalZone = pieceInFinalAttackZone(piece);
+    const lane = cpuAttackLaneKey(piece.col);
+
+    let risk = 0;
+
+    if(goalDistance === 1) risk += 250;       // risco máximo
+    else if(goalDistance === 2) risk += 205;  // Carta 4 / dado 2
+    else if(goalDistance === 3) risk += 165;  // Carta 3/7 / dado 3
+    else if(goalDistance === 4) risk += 85;
+    else if(goalDistance === 5) risk += 50;
+    else if(goalDistance === 6) risk += 30;
+
+    if(finalZone) risk += 135;
+
+    if(piece.role === "ATK") risk += 55;
+    if(["ME","MD"].includes(piece.role)) risk += 34;
+    if(["LE","LD"].includes(piece.role)) risk += 14;
+
+    if(piece.row >= 15) risk += 75;
+    else if(piece.row >= 13) risk += 40;
+
+    risk += cpuLearnedRoutePressureForCol(piece.col);
+
+    return {
+        risk,
+        goalDistance,
+        finalZone,
+        lane
+    };
+}
+
+function cpuHumanImmediateRiskScore() {
+    return pieces
+        .filter(piece => piece.player === HUMAN_PLAYER)
+        .reduce((total, piece) => {
+            return total + cpuHumanImmediateThreatProfile(piece).risk;
+        }, 0);
+}
+
+function cpuMostDangerousHumanThreat() {
+    const candidates = pieces
+        .filter(piece => piece.player === HUMAN_PLAYER)
+        .map(piece => {
+            const profile = cpuHumanImmediateThreatProfile(piece);
+            return {
+                piece,
+                profile,
+                score: profile.risk + cpuEnemyPieceDangerBase(piece)
+            };
+        })
+        .sort((a,b) => b.score - a.score);
+
+    return candidates[0] || null;
+}
+
 function cpuHumanGoalThreatWays() {
     let ways = 0;
 
@@ -3789,6 +4040,9 @@ function cpuHumanDangerScore() {
         if(nearestCpu >= 5) pieceDanger += 20;
         else if(nearestCpu >= 3) pieceDanger += 10;
         else pieceDanger -= 7;
+
+        const immediateProfile = cpuHumanImmediateThreatProfile(enemy);
+        pieceDanger += immediateProfile.risk * 0.72;
 
         danger += pieceDanger;
     }
@@ -3883,15 +4137,34 @@ function cpuAttackShapeScore() {
 function cpuBoardStateScore() {
     const goalThreatWays = cpuHumanGoalThreatWays();
     const danger = cpuHumanDangerScore();
+    const immediateRisk = cpuHumanImmediateRiskScore();
     const coverage = cpuDefensiveCoverageScore();
+    const learnedCoverage = cpuLearnedDefenseCoverageScore();
     const attackShape = cpuAttackShapeScore();
+    const comeback = cpuIsComebackMode();
 
-    // Ameaça real de gol pesa muito mais do que simplesmente avançar.
+    // Quando está perdendo por 2+, a CPU muda de personalidade:
+    // mantém respeito ao perigo imediato, mas dá muito mais peso ao ataque
+    // com ATK + ME/MD e a casas que criem gol no próximo turno.
+    if(comeback) {
+        return (
+            coverage * 1.95 +
+            learnedCoverage * 1.35 +
+            attackShape * 1.75 -
+            danger * 1.42 -
+            immediateRisk * 1.90 -
+            goalThreatWays * 330
+        );
+    }
+
+    // Em situação normal, bloquear ameaça de gol é prioridade absoluta.
     return (
-        coverage * 2.4 +
-        attackShape * 0.85 -
-        danger * 1.65 -
-        goalThreatWays * 340
+        coverage * 2.45 +
+        learnedCoverage * 1.55 +
+        attackShape * 0.88 -
+        danger * 1.70 -
+        immediateRisk * 2.25 -
+        goalThreatWays * 360
     );
 }
 
@@ -3966,11 +4239,17 @@ function cpuPositionQualityScore(piece) {
 
     // Quanto mais resultados diferentes do próximo dado produzem gol,
     // melhor é a casa — aprendizado direto do vídeo.
-    score += future.ways * 42;
-    score += future.corridors.size * 18;
+    const comebackMultiplier = cpuIsComebackMode() ? 1.65 : 1;
 
-    if(piece.role === "ATK") score *= 1.18;
-    if(["ME","MD"].includes(piece.role)) score *= 1.08;
+    score += future.ways * 42 * comebackMultiplier;
+    score += future.corridors.size * 18 * comebackMultiplier;
+
+    if(cpuIsComebackMode() && ["ATK","ME","MD"].includes(piece.role)) {
+        score += Math.max(0, 10 - piece.row) * 7;
+    }
+
+    if(piece.role === "ATK") score *= cpuIsComebackMode() ? 1.34 : 1.18;
+    if(["ME","MD"].includes(piece.role)) score *= cpuIsComebackMode() ? 1.24 : 1.08;
 
     return score;
 }
@@ -4096,7 +4375,9 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
 
     const beforeThreatWays = cpuHumanGoalThreatWays();
     const beforeDanger = cpuHumanDangerScore();
+    const beforeImmediateRisk = cpuHumanImmediateRiskScore();
     const beforeCoverage = cpuDefensiveCoverageScore();
+    const beforeLearnedCoverage = cpuLearnedDefenseCoverageScore();
     const beforePositionQuality = cpuPositionQualityScore(piece);
     const beforeAttackShape = cpuAdvancedThreatShapeScore();
 
@@ -4105,7 +4386,9 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
             board: cpuBoardStateScore(),
             threatWays: cpuHumanGoalThreatWays(),
             danger: cpuHumanDangerScore(),
+            immediateRisk: cpuHumanImmediateRiskScore(),
             coverage: cpuDefensiveCoverageScore(),
+            learnedCoverage: cpuLearnedDefenseCoverageScore(),
             positionQuality: cpuPositionQualityScore(piece),
             midfieldSupport: cpuMidfieldSupportScore(piece),
             attackShape: cpuAdvancedThreatShapeScore()
@@ -4132,7 +4415,19 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
         score -= (simulation.threatWays - beforeThreatWays) * 330;
     }
 
-    score += (beforeDanger - simulation.danger) * 1.25;
+    score += (beforeDanger - simulation.danger) * 1.35;
+
+    // Defesa por AMEAÇA: se uma jogada fecha a rota de um atacante/meia
+    // que poderia marcar em 1, 2 ou 3 casas, ela recebe um bônus muito alto.
+    score += (beforeImmediateRisk - simulation.immediateRisk) * 2.85;
+
+    // Depois de identificar a mesma rota 2+ vezes, a CPU começa a deslocar
+    // sua linha defensiva para o corredor/diagonal usado pelo jogador.
+    score += (simulation.learnedCoverage - beforeLearnedCoverage) * 2.15;
+
+    if(simulation.immediateRisk > beforeImmediateRisk) {
+        score -= (simulation.immediateRisk - beforeImmediateRisk) * 1.65;
+    }
 
     score += cpuManageResultMoveBonus(
         piece,
@@ -4200,6 +4495,31 @@ function cpuMoveScoreV4(piece,target,beforeBoardScore = null) {
     if(piece.role === "GO") {
         score += Math.max(0, 5 - centerDistance) * 6;
         score -= Math.abs(target.row - 17) * 8;
+    }
+
+    if(cpuIsComebackMode()) {
+        const attackingRole = ["ATK","ME","MD"].includes(piece.role);
+
+        if(attackingRole) {
+            // Pressão real: ATK + meia precisam chegar juntos.
+            score += Math.max(0, progress) * 11;
+
+            if(target.row <= 9) score += 22;
+            if(target.row <= 7) score += 28;
+
+            const futureAfterMove = simulation.positionQuality - beforePositionQuality;
+            if(futureAfterMove > 0) score += futureAfterMove * 0.55;
+        }
+
+        // Evita recuo gratuito das peças ofensivas quando o placar exige reação,
+        // exceto quando o movimento reduz claramente um risco imediato.
+        if(
+            attackingRole &&
+            target.row > piece.row &&
+            beforeImmediateRisk - simulation.immediateRisk < 80
+        ) {
+            score -= (target.row - piece.row) * 28;
+        }
     }
 
     // Pequena variação evita partidas idênticas sem destruir a estratégia.
@@ -4423,7 +4743,7 @@ function cpuFindBestCardThenNormalSequence(cardDistance) {
 // ------------------------------------------------------------
 // INTELIGÊNCIA DAS CARTAS
 // ------------------------------------------------------------
-function cpuEnemyPieceDanger(piece) {
+function cpuEnemyPieceDangerBase(piece) {
     if(!piece || piece.player !== HUMAN_PLAYER) return -9999;
 
     let score = piece.row * 4;
@@ -4435,6 +4755,17 @@ function cpuEnemyPieceDanger(piece) {
     if(piece.row >= 15) score += 90;
 
     return score;
+}
+
+function cpuEnemyPieceDanger(piece) {
+    if(!piece || piece.player !== HUMAN_PLAYER) return -9999;
+
+    const profile = cpuHumanImmediateThreatProfile(piece);
+
+    return (
+        cpuEnemyPieceDangerBase(piece) +
+        profile.risk * 1.15
+    );
 }
 
 function cpuBestExpulsionTarget() {
@@ -4483,11 +4814,13 @@ function cpuBestReservePlan() {
             piece.row <= 8
         );
 
-        const preference = danger > 125
-            ? ["ZG","LE","LD","MD","ME","ATK"]
-            : hasAdvancedAtk
-                ? ["ATK","MD","ME","ZG","LE","LD"]
-                : ["ATK","MD","ME","ZG","LE","LD"];
+        const preference = cpuIsComebackMode()
+            ? ["ATK","ME","MD","ZG","LE","LD"]
+            : danger > 125
+                ? ["ZG","LE","LD","MD","ME","ATK"]
+                : hasAdvancedAtk
+                    ? ["ATK","MD","ME","ZG","LE","LD"]
+                    : ["ATK","MD","ME","ZG","LE","LD"];
 
         role = preference.find(candidate => availableRoles.includes(candidate)) || availableRoles[0];
         source = "reserve";
@@ -4521,6 +4854,7 @@ function cpuBestBlockPlan() {
 
     const before = cpuBoardStateScore();
     const beforeThreatWays = cpuHumanGoalThreatWays();
+    const mainThreat = cpuMostDangerousHumanThreat();
     let best = null;
 
     for(const cell of cells) {
@@ -4544,6 +4878,16 @@ function cpuBestBlockPlan() {
         // BLOCK mais perto da zona ameaçada tende a ser mais útil.
         score += Math.max(0, cell.row - 10) * 2;
         score += Math.max(0, 4 - Math.abs(cell.col - 5)) * 4;
+
+        if(mainThreat) {
+            const threatCol = mainThreat.piece.col;
+            score += Math.max(0, 5 - Math.abs(cell.col - threatCol)) * 14;
+            score += mainThreat.profile.risk * 0.12;
+        }
+
+        if(cpuIsComebackMode() && mainThreat?.profile.risk >= 120) {
+            score += 85;
+        }
 
         if(cpuManageResultThisTurn) {
             // Nos minutos finais, tenta fechar os corredores próximos do próprio gol.
@@ -4595,6 +4939,9 @@ function cpuBestCardMove(distance, excludedPieceIds = []) {
 function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
     const threatWays = cpuHumanGoalThreatWays();
     const danger = cpuHumanDangerScore();
+    const immediateRisk = cpuHumanImmediateRiskScore();
+    const comeback = cpuIsComebackMode();
+    const mainThreat = cpuMostDangerousHumanThreat();
     let priority = -9999;
     let plan = null;
 
@@ -4607,6 +4954,14 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
                 threatWays * 28;
 
             if(plan.piece.row >= 13) priority += 28;
+
+            if(
+                comeback &&
+                mainThreat &&
+                String(mainThreat.piece.id) === String(plan.piece.id)
+            ) {
+                priority += 105 + mainThreat.profile.risk * 0.18;
+            }
         }
     }
 
@@ -4717,6 +5072,10 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
                 danger * 0.12;
 
             if(cpuManageResultThisTurn) priority += 180;
+
+            if(comeback && immediateRisk >= 120) {
+                priority += 95 + Math.min(90, immediateRisk * 0.08);
+            }
         }
     }
 
@@ -4730,6 +5089,10 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
                 threatWays * 35;
 
             if(cpuManageResultThisTurn) priority += 95;
+
+            if(comeback && immediateRisk >= 100) {
+                priority += 90 + Math.min(80, immediateRisk * 0.07);
+            }
         }
     }
 
@@ -4749,6 +5112,14 @@ function cpuEvaluateCardOption(cardId, slotIndex, forcedByFullHand = false) {
 
             if(cpuManageResultThisTurn) priority += 160;
         }
+    }
+
+    if(
+        comeback &&
+        plan &&
+        [3,4,7].includes(cardId)
+    ) {
+        priority += 42;
     }
 
     if(plan && forcedByFullHand) {
@@ -5018,6 +5389,7 @@ function cpuTryUseStrategicCard() {
 // ------------------------------------------------------------
 function cpuChooseAndMove() {
     cpuActionTimer = null;
+    clearCpuCeraCountdown();
 
     if(
         !isCpuTurn() ||
@@ -5102,7 +5474,9 @@ function cpuChooseAndMove() {
 
     let tacticalLabel = cpuManageResultThisTurn
         ? "administrando a vantagem e fechando espaços"
-        : "melhorando a posição";
+        : (cpuIsComebackMode()
+            ? "pressionando com ATK + meio-campo para buscar a reação"
+            : "melhorando a posição");
 
     if(!cpuManageResultThisTurn && cpuIsDiagonalStep(piece,target) && piece.role === "ATK") {
         tacticalLabel = "abrindo diagonal de ataque";
@@ -5191,7 +5565,11 @@ function runCpuTurn() {
     }
 
     cpuThinking = true;
-    setMessage("🤖 CPU V4 está lendo corredores, diagonais, apoio dos meias, cartas e oportunidades de gol...");
+    setMessage(
+        cpuIsComebackMode()
+            ? "😡 CPU está atrás no placar: ATK + meias subiram e a defesa está marcando a maior ameaça."
+            : "🤖 CPU está lendo ameaça imediata, corredores repetidos, diagonais, cartas e oportunidades de gol..."
+    );
     render();
 
     // Antes do dado a CPU pode usar uma carta — especialmente se os slots
@@ -5235,6 +5613,7 @@ function scheduleCpuIfNeeded(delay=850) {
         scheduledDelay = cpuManageResultDelayMs;
 
         const seconds = Math.round(cpuManageResultDelayMs / 1000);
+        startCpuCeraCountdown(scheduledDelay);
         setMessage(
             `😏 CPU entrou na retranca e está fazendo cera... pensando a jogada (${seconds}s).`
         );
@@ -7222,7 +7601,7 @@ function animatePieceAlongPath(piece, path, onComplete) {
     moveAnimationActive = true;
     document.querySelector(".game-container")?.classList.add("move-in-progress");
     document.querySelectorAll(".cell.possible, .goal-cell.possible").forEach(target => {
-        target.classList.remove("possible");
+        target.classList.remove("possible", "goal-chance");
     });
 
     element.classList.add("moving");
@@ -7468,9 +7847,12 @@ function handleGoalClick(row, col, attackingPlayer) {
 
     const piece = selectedPiece;
     const scoringPlayer = currentPlayer;
+    const fromRow = piece.row;
+    const fromCol = piece.col;
     const path = getAnimationPathForDistance(piece, row, col, diceValue);
 
     animatePieceAlongPath(piece, path.length ? path : [{ row, col }], () => {
+        cpuRecordHumanAttackMovement(piece, fromRow, fromCol, row, col);
         piece.row = row;
         piece.col = col;
         registerGoal(scoringPlayer, piece);
@@ -8329,6 +8711,8 @@ function movePieceWithCard3(row, col) {
         return true;
     }
 
+    const fromRow = piece.row;
+    const fromCol = piece.col;
     const path = getAnimationPathForDistance(piece, row, col, CARD_3_DISTANCE);
     const visualPath = path.length ? path : [{ row, col }];
 
@@ -8336,6 +8720,7 @@ function movePieceWithCard3(row, col) {
     showCard3Trail(piece, visualPath);
 
     animatePieceAlongPath(piece, visualPath, () => {
+        cpuRecordHumanAttackMovement(piece, fromRow, fromCol, row, col);
         piece.row = row;
         piece.col = col;
 
@@ -8411,6 +8796,8 @@ function movePieceWithCard4(row, col) {
         return true;
     }
 
+    const fromRow = piece.row;
+    const fromCol = piece.col;
     const path = getAnimationPathForDistance(piece, row, col, CARD_4_DISTANCE);
     const visualPath = path.length ? path : [{ row, col }];
 
@@ -8418,6 +8805,7 @@ function movePieceWithCard4(row, col) {
     showCard4PassArrow(piece, row, col);
 
     animatePieceAlongPath(piece, visualPath, () => {
+        cpuRecordHumanAttackMovement(piece, fromRow, fromCol, row, col);
         piece.row = row;
         piece.col = col;
 
@@ -8534,9 +8922,12 @@ function movePieceWithCard7(row, col) {
         return true;
     }
 
+    const fromRow = piece.row;
+    const fromCol = piece.col;
     const path = getAnimationPathForDistance(piece, row, col, CARD_7_DISTANCE);
 
     animatePieceAlongPath(piece, path.length ? path : [{ row, col }], () => {
+        cpuRecordHumanAttackMovement(piece, fromRow, fromCol, row, col);
         piece.row = row;
         piece.col = col;
 
@@ -9319,11 +9710,11 @@ function render() {
 
 
     redGoalCells.forEach(cell =>
-        cell.classList.remove("possible")
+        cell.classList.remove("possible", "goal-chance")
     );
 
     blueGoalCells.forEach(cell =>
-        cell.classList.remove("possible")
+        cell.classList.remove("possible", "goal-chance")
     );
 
 
@@ -9410,13 +9801,13 @@ function render() {
         sprintMoves.forEach(move => {
             if(move.row === -1) {
                 const goalCell = document.querySelector(`#redGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
             if(move.row === ROWS) {
                 const goalCell = document.querySelector(`#blueGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
@@ -9439,13 +9830,13 @@ function render() {
         passMoves.forEach(move => {
             if(move.row === -1) {
                 const goalCell = document.querySelector(`#redGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
             if(move.row === ROWS) {
                 const goalCell = document.querySelector(`#blueGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
@@ -9469,13 +9860,13 @@ function render() {
         plannedMoves.forEach(move => {
             if(move.row === -1) {
                 const goalCell = document.querySelector(`#redGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
             if(move.row === ROWS) {
                 const goalCell = document.querySelector(`#blueGoal .goal-cell[data-col="${move.col}"]`);
-                if(goalCell) goalCell.classList.add("possible");
+                if(goalCell) goalCell.classList.add("possible", "goal-chance");
                 return;
             }
 
@@ -9512,7 +9903,7 @@ function render() {
                         );
 
                     if(goalCell) {
-                        goalCell.classList.add("possible");
+                        goalCell.classList.add("possible", "goal-chance");
                     }
 
                     return;
@@ -9528,7 +9919,7 @@ function render() {
                         );
 
                     if(goalCell) {
-                        goalCell.classList.add("possible");
+                        goalCell.classList.add("possible", "goal-chance");
                     }
 
                     return;
@@ -9946,9 +10337,12 @@ function handleCellClick(
 
     const piece = selectedPiece;
     const movement = diceValue;
+    const fromRow = piece.row;
+    const fromCol = piece.col;
     const path = getAnimationPathForDistance(piece, row, col, movement);
 
     animatePieceAlongPath(piece, path.length ? path : [{ row, col }], () => {
+        cpuRecordHumanAttackMovement(piece, fromRow, fromCol, row, col);
         piece.row = row;
         piece.col = col;
 
@@ -11247,10 +11641,14 @@ function updateInterface() {
     const turn = document.getElementById("turnText");
     const blue = document.getElementById("bluePlayer");
     const red = document.getElementById("redPlayer");
+    const blueSide = document.querySelector(".team-side.blue-side");
+    const redSide = document.querySelector(".team-side.red-side");
     const confirmButton = document.getElementById("formationConfirmButton");
 
     blue.classList.remove("active");
     red.classList.remove("active");
+    blueSide?.classList.remove("turn-active");
+    redSide?.classList.remove("turn-active");
 
     if(formationSetupActive) {
         const isRed = formationSetupPlayer === 1;
@@ -11260,6 +11658,7 @@ function updateInterface() {
             : (isRed ? `FORMAÇÃO ${playerName(1)}` : (isCpuMode() ? `CPU MONTANDO ${playerName(0)}` : `FORMAÇÃO ${playerName(0)}`))
         );
         (isRed ? red : blue).classList.add("active");
+        (isRed ? redSide : blueSide)?.classList.add("turn-active");
 
         document.querySelectorAll(".dice-button").forEach(button => {
             button.disabled = true;
@@ -11311,6 +11710,7 @@ function updateInterface() {
             setTurnDisplay(isCpuMode() ? (cpuThinking ? `🤖 CPU ${playerName(0)} PENSANDO...` : `VEZ DA CPU • ${playerName(0)} 🤖`) : `VEZ DO ${playerName(0)}`);
         }
         blue.classList.add("active");
+        blueSide?.classList.add("turn-active");
     } else {
         if(isOnlineMode()) {
             setTurnDisplay(getOnlineLocalPlayerIndex() === 1
@@ -11320,6 +11720,7 @@ function updateInterface() {
             setTurnDisplay(`VEZ DO ${playerName(1)}`);
         }
         red.classList.add("active");
+        redSide?.classList.add("turn-active");
     }
 
     document.querySelectorAll(".dice-button").forEach(button => {
@@ -11827,6 +12228,7 @@ function newGame() {
     clearCpuTimers();
     cpuTurnsCompleted = 0;
     cpuResetManageResultTurnState();
+    cpuResetHumanAttackMemory();
 
     if(card7LingeringFireTimer) {
         clearTimeout(card7LingeringFireTimer);

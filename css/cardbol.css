@@ -6376,3 +6376,115 @@ body.cardbol-level-3 .ranking-level-info strong {
         font-size: 7px;
     }
 }
+
+
+/* =========================================================
+   FEEDBACK DE TURNO — BRILHO NA LATERAL ATIVA
+========================================================= */
+.team-side {
+    transition:
+        box-shadow .22s ease,
+        border-color .22s ease,
+        filter .22s ease;
+}
+
+.team-side.red-side.turn-active {
+    border-color: rgba(248,113,113,.72) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(248,113,113,.34),
+        inset 0 0 24px rgba(239,68,68,.13),
+        0 0 18px rgba(239,68,68,.22);
+}
+
+.team-side.blue-side.turn-active {
+    border-color: rgba(96,165,250,.75) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(96,165,250,.34),
+        inset 0 0 24px rgba(59,130,246,.14),
+        0 0 18px rgba(59,130,246,.24);
+}
+
+.team-side.turn-active .side-team-title {
+    filter: brightness(1.15);
+}
+
+/* =========================================================
+   DESTINO QUE RESULTA DIRETAMENTE EM GOL
+========================================================= */
+.goal-cell.possible.goal-chance {
+    background:
+        radial-gradient(circle at 50% 50%, rgba(255,248,130,.95), rgba(250,204,21,.80) 46%, rgba(234,88,12,.82)) !important;
+    box-shadow:
+        inset 0 0 0 3px #fff7a8,
+        0 0 13px rgba(250,204,21,.95),
+        0 0 25px rgba(249,115,22,.62) !important;
+    animation: goalChancePulse .72s ease-in-out infinite alternate;
+}
+
+.goal-cell.possible.goal-chance::after {
+    content: "GOL!";
+    width: auto;
+    aspect-ratio: auto;
+    padding: 2px 4px;
+    background: rgba(17,24,39,.88);
+    color: #fef08a;
+    border: 1px solid rgba(255,255,255,.82);
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(250,204,21,.78);
+    font-size: clamp(5px,.62vw,8px);
+    line-height: 1;
+    font-weight: 1000;
+    letter-spacing: .2px;
+}
+
+@keyframes goalChancePulse {
+    from { transform: scale(.96); filter: brightness(.96); }
+    to   { transform: scale(1.04); filter: brightness(1.18); }
+}
+
+/* =========================================================
+   CPU FAZENDO CERA — CONTADOR JUNTO AO ESCUDO
+========================================================= */
+.cpu-cera-status {
+    display: none;
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    color: #fde68a;
+    font-size: 7px;
+    line-height: 1;
+    font-weight: 1000;
+    letter-spacing: .1px;
+    text-shadow: 0 1px 3px rgba(0,0,0,.9);
+}
+
+.cpu-cera-status.show {
+    display: inline-flex;
+    max-width: 150px;
+    padding: 3px 5px;
+    border: 1px solid rgba(250,204,21,.36);
+    border-radius: 999px;
+    background: rgba(113,63,18,.64);
+    animation: cpuCeraBadgePulse .8s ease-in-out infinite alternate;
+}
+
+@keyframes cpuCeraBadgePulse {
+    from { opacity:.76; transform:scale(.98); }
+    to   { opacity:1; transform:scale(1.02); }
+}
+
+@media (orientation: landscape) and (max-height:650px) {
+    .cpu-cera-status.show {
+        max-width: 115px;
+        padding: 2px 4px;
+        font-size: 5px;
+    }
+
+    .team-side.red-side.turn-active,
+    .team-side.blue-side.turn-active {
+        box-shadow:
+            inset 0 0 0 1px currentColor,
+            inset 0 0 14px rgba(255,255,255,.06),
+            0 0 10px rgba(255,255,255,.10);
+    }
+}

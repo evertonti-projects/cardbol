@@ -355,6 +355,29 @@ card8BlockAudio.preload = "auto";
 const card10CatimbaAudio = new Audio("audios/audio-carta10.mp3");
 card10CatimbaAudio.preload = "auto";
 
+// Carta 7 — efeito de fogo da JOGADA ENSAIADA.
+const card7FireAudio = new Audio("audios/audio-efeito-carta7-fogo.mp3");
+card7FireAudio.preload = "auto";
+card7FireAudio.volume = 0.9;
+
+// Trilha ambiente do menu / formação / intervalo.
+// A faixa inicial e as seguintes são sorteadas sem repetição imediata.
+const menuMusicPaths = [
+    "audios/audio1-menu.mp3",
+    "audios/audio2-menu.mp3",
+    "audios/audio3-menu.mp3",
+    "audios/audio4-menu.mp3"
+];
+
+const menuMusicAudio = new Audio();
+menuMusicAudio.preload = "auto";
+menuMusicAudio.volume = 0.24;
+
+let menuMusicLastIndex = -1;
+let menuMusicFadeTimer = null;
+let menuMusicEnabled = false;
+let menuMusicPrimed = false;
+
 const kickoffRouletteAudio = new Audio("audios/audio-roleta-gira.mp3");
 kickoffRouletteAudio.preload = "auto";
 kickoffRouletteAudio.loop = true;
@@ -381,6 +404,155 @@ let nextCard8VideoIndex = 0;
 let nextCard9VideoIndex = 0;
 let nextCard10VideoIndex = 0;
 let cardVideoTimeoutId = null;
+
+function chooseNextMenuMusicIndex() {
+    if(menuMusicPaths.length <= 1) return 0;
+
+    const candidates = menuMusicPaths
+        .map((_, index) => index)
+        .filter(index => index !== menuMusicLastIndex);
+
+    return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function playSelectedMenuTrack(index, resetTime = true) {
+    if(!Number.isInteger(index) || !menuMusicPaths[index]) return;
+
+    menuMusicLastIndex = index;
+    menuMusicAudio.src = menuMusicPaths[index];
+
+    if(resetTime) {
+        try { menuMusicAudio.currentTime = 0; } catch(error) {}
+    }
+
+    menuMusicAudio.volume = 0.24;
+
+    const promise = menuMusicAudio.play();
+    if(promise && typeof promise.catch === "function") {
+        promise.catch(() => {});
+    }
+}
+
+function startMenuMusic({ forceNewTrack = false } = {}) {
+    menuMusicEnabled = true;
+
+    if(menuMusicFadeTimer) {
+        clearInterval(menuMusicFadeTimer);
+        menuMusicFadeTimer = null;
+    }
+
+    // Se a faixa já está tocando, não reinicia ao trocar de uma tela
+    // de menu para outra ou ao entrar na formação.
+    if(
+        !forceNewTrack &&
+        !menuMusicAudio.paused &&
+        menuMusicAudio.src
+    ) {
+        menuMusicAudio.volume = 0.24;
+        return;
+    }
+
+    // Se havia uma faixa pausada no meio, retomamos a mesma durante
+    // a mesma passagem pelos menus; um novo intervalo pode forçar sorteio.
+    if(
+        !forceNewTrack &&
+        menuMusicAudio.src &&
+        menuMusicAudio.currentTime > 0 &&
+        !menuMusicAudio.ended
+    ) {
+        menuMusicAudio.volume = 0.24;
+        const promise = menuMusicAudio.play();
+        if(promise && typeof promise.catch === "function") {
+            promise.catch(() => {});
+        }
+        return;
+    }
+
+    playSelectedMenuTrack(chooseNextMenuMusicIndex(), true);
+}
+
+function fadeOutMenuMusic(duration = 900) {
+    menuMusicEnabled = false;
+
+    if(menuMusicFadeTimer) {
+        clearInterval(menuMusicFadeTimer);
+        menuMusicFadeTimer = null;
+    }
+
+    if(menuMusicAudio.paused) {
+        menuMusicAudio.volume = 0.24;
+        return;
+    }
+
+    const startVolume = Math.max(0, Math.min(1, menuMusicAudio.volume));
+    const startedAt = performance.now();
+
+    menuMusicFadeTimer = setInterval(() => {
+        const progress = Math.min(1, (performance.now() - startedAt) / duration);
+        menuMusicAudio.volume = Math.max(0, startVolume * (1 - progress));
+
+        if(progress >= 1) {
+            clearInterval(menuMusicFadeTimer);
+            menuMusicFadeTimer = null;
+
+            menuMusicAudio.pause();
+            menuMusicAudio.currentTime = 0;
+            menuMusicAudio.volume = 0.24;
+        }
+    }, 30);
+}
+
+// Primeiro clique da abertura: prepara um arquivo de trilha dentro do gesto
+// do usuário para aumentar a compatibilidade com as políticas de autoplay.
+function primeMenuMusic() {
+    if(menuMusicPrimed) return;
+    menuMusicPrimed = true;
+
+    const index = chooseNextMenuMusicIndex();
+    menuMusicLastIndex = index;
+    menuMusicAudio.src = menuMusicPaths[index];
+    menuMusicAudio.volume = 0;
+
+    try {
+        const promise = menuMusicAudio.play();
+
+        if(promise && typeof promise.then === "function") {
+            promise
+                .then(() => {
+                    setTimeout(() => {
+                        menuMusicAudio.pause();
+                        menuMusicAudio.currentTime = 0;
+                        menuMusicAudio.volume = 0.24;
+                    }, 40);
+                })
+                .catch(() => {
+                    menuMusicAudio.volume = 0.24;
+                });
+        }
+    } catch(error) {
+        menuMusicAudio.volume = 0.24;
+    }
+}
+
+menuMusicAudio.addEventListener("ended", () => {
+    if(!menuMusicEnabled) return;
+    playSelectedMenuTrack(chooseNextMenuMusicIndex(), true);
+});
+
+function playCard7FireAudio() {
+    try {
+        card7FireAudio.pause();
+        card7FireAudio.currentTime = 0;
+        card7FireAudio.volume = 0.9;
+
+        const promise = card7FireAudio.play();
+        if(promise && typeof promise.catch === "function") {
+            promise.catch(() => {});
+        }
+    } catch(error) {
+        // Áudio nunca deve impedir o uso da carta.
+    }
+}
 
 // Peças que continuam com fogo por 3 segundos após concluir a Carta 7.
 // Chaves no formato "player:id" para impedir que o efeito passe ao adversário.
@@ -814,6 +986,8 @@ function clearCpuTimers() {
 }
 
 function showGameModeOverlay() {
+    startMenuMusic();
+
     const overlay = document.getElementById("gameModeOverlay");
     if(!overlay) return;
     overlay.classList.add("show");
@@ -847,6 +1021,8 @@ let currentUserIdentity = {
 let playerIdentitySubmitting = false;
 
 function showPlayerIdentityOverlay() {
+    startMenuMusic();
+
     const overlay = document.getElementById("playerIdentityOverlay");
     const usernameInput = document.getElementById("playerUsernameInput");
     const pinInput = document.getElementById("playerPinInput");
@@ -1540,6 +1716,8 @@ const RULES_PAGE_COUNT = 5;
 let currentRulesPage = 0;
 
 function showRulesOverlay() {
+    startMenuMusic();
+
     const overlay = document.getElementById("rulesOverlay");
     if(!overlay) {
         showGameModeOverlay();
@@ -2028,6 +2206,8 @@ function handleOnlineVisualEvent(event) {
         playRemoteMoveGhost(event);
     } else if(event.type === "card") {
         playRemoteCardVideo(event.payload?.cardId);
+    } else if(event.type === "card7fire") {
+        playCard7FireAudio();
     }
 }
 
@@ -2149,6 +2329,17 @@ function restoreOnlineGameState(state) {
         matchClockRunning = state.matchClockRunning === true;
         periodBreakActive = state.periodBreakActive === true;
         periodBreakType = state.periodBreakType || null;
+
+        // No convidado online, o host é quem finaliza o intervalo no servidor.
+        // Quando chega o snapshot do 2º tempo ativo, encerra a trilha local também.
+        if(
+            matchPeriod === 2 &&
+            matchClockRunning &&
+            !periodBreakActive &&
+            formationSetupActive === false
+        ) {
+            fadeOutMenuMusic(900);
+        }
         const remoteKickoffRaw = state.initialKickoffPlayer;
         initialKickoffPlayer = (
             remoteKickoffRaw === 0 || remoteKickoffRaw === 1 ||
@@ -2645,6 +2836,8 @@ function getOnlineSessionPayload() {
 }
 
 function showOnlineLobbyOverlay() {
+    startMenuMusic();
+
     const overlay = document.getElementById("onlineLobbyOverlay");
     const home = document.getElementById("onlineLobbyHome");
     const room = document.getElementById("onlineRoomView");
@@ -3427,6 +3620,8 @@ async function copyOnlineRoomCode() {
 
 
 function showTeamSelectOverlay() {
+    startMenuMusic();
+
     const overlay = document.getElementById("teamSelectOverlay");
     if(!overlay) return;
 
@@ -5946,6 +6141,7 @@ function applyHalftimeFormationToPlayer(player, formation) {
 async function beginOnlineHalftimeFormationSetup() {
     if(!isOnlineMode()) return;
 
+    startMenuMusic();
     hidePeriodOverlay();
 
     try {
@@ -6089,6 +6285,9 @@ async function finishOnlineHalftimeIfReady() {
     applyHalftimeFormationToPlayer(1, onlineLobbyState.halftimeHostFormation);
     applyHalftimeFormationToPlayer(0, onlineLobbyState.halftimeGuestFormation);
 
+    // As duas formações estão prontas: encerra a trilha do intervalo.
+    fadeOutMenuMusic(900);
+
     formationSetupActive = false;
     formationSetupReason = "initial";
     formationSetupPlayer = null;
@@ -6137,6 +6336,8 @@ async function finishOnlineHalftimeIfReady() {
 }
 
 function beginHalftimeFormationSetup() {
+    startMenuMusic();
+
     if(isOnlineMode()) {
         beginOnlineHalftimeFormationSetup();
         return;
@@ -6173,6 +6374,8 @@ function completeFormationSetup() {
     resetDiceDisplay();
 
     if(formationSetupReason === "halftime") {
+        fadeOutMenuMusic(900);
+
         formationSetupReason = "initial";
         kickoffDrawPending = false;
         kickoffResolved = true;
@@ -8406,6 +8609,14 @@ function activateCard(player, slotIndex, cpuInitiated = false) {
             movedPieceIds:[],
             movesDone:0
         };
+
+        // O áudio entra junto com o início do efeito visual de fogo.
+        playCard7FireAudio();
+
+        if(isOnlineMode() && !onlineApplyingRemoteState && !onlineRemoteVisualPlayback) {
+            emitOnlineVisualEvent("card7fire", { player });
+        }
+
         setMessage(`🎯 “JOGADA ENSAIADA!” — mova ${CARD_7_MOVES} jogadores seus, um por vez, até ${CARD_7_DISTANCE} casas cada.`);
     } else if(cardId === 8) {
         const availableCells = getBlockPlacementCells(player);
@@ -10904,6 +11115,8 @@ function resetTurnClock() {
 }
 
 function startMatchClock() {
+    fadeOutMenuMusic(900);
+
     matchClockRunning = true;
     periodBreakActive = false;
     lastClockTickAt = Date.now();
@@ -10977,6 +11190,12 @@ function getPeriodKickoffPlayer(periodNumber) {
 }
 
 function showPeriodOverlay(title, detail, buttonText, breakType) {
+    if(breakType === "secondHalf") {
+        // Intervalo recebe uma nova faixa aleatória e ela continua
+        // durante a reorganização das formações.
+        startMenuMusic({ forceNewTrack: true });
+    }
+
     periodBreakActive = true;
     periodBreakType = breakType;
     matchClockRunning = false;
@@ -12206,6 +12425,9 @@ document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 function newGame() {
 
+    // Reiniciar leva novamente à formação: sorteia uma trilha ambiente.
+    startMenuMusic({ forceNewTrack: true });
+
     // Cada partida oficial recebe uma chave única.
     // Isso impede duplicidade no Supabase.
     currentMatchKey = createCardBolMatchKey();
@@ -12346,6 +12568,10 @@ function getKickoffSectors() {
 }
 
 function showKickoffRoulette() {
+    // Formação terminou: a trilha de menu sai suavemente antes
+    // do áudio específico da roleta e do início da partida.
+    fadeOutMenuMusic(900);
+
     const overlay = document.getElementById("kickoffOverlay");
     const wheel = document.getElementById("kickoffWheel");
     const button = document.getElementById("kickoffButton");
@@ -12604,6 +12830,10 @@ function requestOpeningFullscreen() {
 function chooseOpeningDisplayMode(mode) {
     if(openingPresentationStarted) return;
 
+    // Aproveita o primeiro gesto real do usuário para liberar também
+    // a futura trilha dos menus nos navegadores móveis.
+    primeMenuMusic();
+
     hideOpeningDisplayChoices();
 
     // As duas ações abaixo acontecem diretamente dentro do clique do usuário.
@@ -12752,6 +12982,11 @@ function enterCardBolGame() {
     fadeOutOpeningAudio(1000, () => {
         screen.style.display = "none";
         applyTeamBranding();
+
+        // A trilha aleatória assume o áudio depois da apresentação
+        // e permanece por login, regras, menus e formação.
+        startMenuMusic({ forceNewTrack: true });
+
         showPlayerIdentityOverlay();
     });
 }

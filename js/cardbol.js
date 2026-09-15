@@ -1408,6 +1408,12 @@ function openRankingOverlay(openMode = "manual") {
     const overlay = document.getElementById("rankingOverlay");
     if(!overlay) return;
 
+    // Se o jogador abriu o ranking por vontade própria após o fim da partida,
+    // mantém os 10s manuais e evita uma segunda abertura automática depois.
+    if(openMode === "manual" && winner !== null) {
+        clearVictoryRankingCountdown({ hideBadge: false });
+    }
+
     const postgame = openMode === "postgame";
     const limitMs = postgame ? RANKING_POSTGAME_LIMIT_MS : RANKING_MANUAL_LIMIT_MS;
 
@@ -1603,12 +1609,8 @@ async function registerOfficialMatchToRanking(winningPlayer) {
                 "success"
             );
 
-            setTimeout(() => {
-                if(currentMatchKey === submittedMatchKey && winner !== null && !rankingOverlayOpen) {
-                    openRankingOverlay("postgame");
-                }
-            }, 900);
-
+            // A abertura automática do ranking é controlada pela tela de vitória:
+            // 30 segundos após a comemoração começar.
             return;
         }
 
@@ -1625,13 +1627,9 @@ async function registerOfficialMatchToRanking(winningPlayer) {
             "success"
         );
 
-        // No fim da partida, mostra automaticamente a classificação
-        // já com o resultado recém-gravado.
-        setTimeout(() => {
-            if(currentMatchKey === submittedMatchKey && winner !== null && !rankingOverlayOpen) {
-                openRankingOverlay("postgame");
-            }
-        }, 900);
+        // O ranking será exibido automaticamente 30s após a abertura
+        // da tela de campeão. O registro pode terminar antes disso sem
+        // interromper a comemoração.
 
     } catch(error) {
         console.error("CardBol ranking:", error);
@@ -1869,8 +1867,13 @@ let onlineLobbyState = {
 // ============================================================
 // ONLINE FASE 3 — SINCRONIZAÇÃO DA PARTIDA + LIMITES DE TEMPO
 // ============================================================
-const ONLINE_FORMATION_LIMIT_MS = 30 * 1000;
-const ONLINE_GOAL_BREAK_MS = 10 * 1000;
+const FORMATION_LIMIT_MS = 90 * 1000;
+const PERIOD_BREAK_LIMIT_MS = 90 * 1000;
+const GOAL_BREAK_MS = 10 * 1000;
+const VICTORY_RANKING_DELAY_MS = 30 * 1000;
+
+const ONLINE_FORMATION_LIMIT_MS = FORMATION_LIMIT_MS;
+const ONLINE_GOAL_BREAK_MS = GOAL_BREAK_MS;
 const RANKING_MANUAL_LIMIT_MS = 10 * 1000;
 const RANKING_POSTGAME_LIMIT_MS = 30 * 1000;
 const ONLINE_RECONNECT_LIMIT_MS = 30 * 1000;
@@ -1905,6 +1908,16 @@ let onlineLastHandledVisualEventId = null;
 let onlineRemoteVisualPlayback = false;
 let onlineReactionPollTimer = null;
 let onlineLastReactionId = 0;
+
+// Timers compartilhados pelos três modos de jogo.
+let localFormationDeadlineAt = null;
+let localFormationTimer = null;
+let localGoalResumeAt = null;
+let localGoalTimer = null;
+let periodBreakDeadlineAt = null;
+let periodBreakCountdownTimer = null;
+let victoryRankingDeadlineAt = null;
+let victoryRankingDelayTimer = null;
 
 function clearOnlinePhaseTimers() {
     if(onlineFormationTimer) clearInterval(onlineFormationTimer);
@@ -1969,6 +1982,155 @@ function hideOnlinePhaseTimer() {
     badge.textContent = "";
 }
 
+function clearLocalFormationCountdown({ hideBadge = true } = {}) {
+    if(localFormationTimer) clearInterval(localFormationTimer);
+    localFormationTimer = null;
+    localFormationDeadlineAt = null;
+    if(hideBadge) hideOnlinePhaseTimer();
+}
+
+function startLocalFormationCountdown() {
+    if(isOnlineMode() || !formationSetupActive) return;
+
+    clearLocalFormationCountdown({ hideBadge: false });
+    localFormationDeadlineAt = Date.now() + FORMATION_LIMIT_MS;
+
+    const tick = () => {
+        if(!formationSetupActive || isOnlineMode()) {
+            clearLocalFormationCountdown();
+            return;
+        }
+
+        // No modo CPU, a formação azul é automática e não precisa esperar 90s.
+        if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
+            clearLocalFormationCountdown();
+            return;
+        }
+
+        const remaining = localFormationDeadlineAt - Date.now();
+        showOnlinePhaseTimer("⚙️ FORMAÇÃO", remaining);
+
+        if(remaining <= 0) {
+            clearLocalFormationCountdown();
+            setMessage("⏱ 90s encerrados. Formação atual confirmada automaticamente.", 0);
+            confirmFormation();
+        }
+    };
+
+    tick();
+    localFormationTimer = setInterval(tick, 250);
+}
+
+function clearLocalGoalCountdown({ hideBadge = true } = {}) {
+    if(localGoalTimer) clearInterval(localGoalTimer);
+    localGoalTimer = null;
+    localGoalResumeAt = null;
+    if(hideBadge) hideOnlinePhaseTimer();
+}
+
+function startLocalGoalCountdown() {
+    if(isOnlineMode() || !goalPause || winner !== null) return;
+
+    clearLocalGoalCountdown({ hideBadge: false });
+    localGoalResumeAt = Date.now() + GOAL_BREAK_MS;
+
+    const tick = () => {
+        if(!goalPause || winner !== null || isOnlineMode()) {
+            clearLocalGoalCountdown();
+            return;
+        }
+
+        const remaining = localGoalResumeAt - Date.now();
+        showOnlinePhaseTimer("⚽ REINÍCIO", remaining);
+
+        const button = document.getElementById("victoryButton");
+        if(button) {
+            button.disabled = false;
+            button.textContent = `CONTINUAR AGORA • ${Math.max(0, Math.ceil(remaining / 1000))}s`;
+        }
+
+        if(remaining <= 0) {
+            clearLocalGoalCountdown();
+            continueAfterGoal();
+        }
+    };
+
+    tick();
+    localGoalTimer = setInterval(tick, 250);
+}
+
+function clearPeriodBreakCountdown({ hideBadge = true } = {}) {
+    if(periodBreakCountdownTimer) clearInterval(periodBreakCountdownTimer);
+    periodBreakCountdownTimer = null;
+    periodBreakDeadlineAt = null;
+    if(hideBadge) hideOnlinePhaseTimer();
+}
+
+function startPeriodBreakCountdown() {
+    if(periodBreakCountdownTimer || !periodBreakActive || periodBreakType !== "secondHalf") return;
+
+    periodBreakDeadlineAt = Date.now() + PERIOD_BREAK_LIMIT_MS;
+
+    const tick = () => {
+        if(!periodBreakActive || periodBreakType !== "secondHalf" || winner !== null) {
+            clearPeriodBreakCountdown();
+            return;
+        }
+
+        const remaining = periodBreakDeadlineAt - Date.now();
+        showOnlinePhaseTimer("⏱ INTERVALO", remaining);
+
+        if(remaining <= 0) {
+            clearPeriodBreakCountdown();
+            setMessage("⏱ 90s de intervalo encerrados. Abrindo a formação do 2º tempo automaticamente.", 0);
+            continueMatchPeriod();
+        }
+    };
+
+    tick();
+    periodBreakCountdownTimer = setInterval(tick, 250);
+}
+
+function clearVictoryRankingCountdown({ hideBadge = true } = {}) {
+    if(victoryRankingDelayTimer) clearInterval(victoryRankingDelayTimer);
+    victoryRankingDelayTimer = null;
+    victoryRankingDeadlineAt = null;
+    if(hideBadge) hideOnlinePhaseTimer();
+}
+
+function startVictoryRankingCountdown() {
+    if(winner === null) return;
+
+    clearVictoryRankingCountdown({ hideBadge: false });
+    victoryRankingDeadlineAt = Date.now() + VICTORY_RANKING_DELAY_MS;
+
+    const tick = () => {
+        if(winner === null) {
+            clearVictoryRankingCountdown();
+            return;
+        }
+
+        const remaining = victoryRankingDeadlineAt - Date.now();
+        showOnlinePhaseTimer("🏆 RANKING AUTOMÁTICO", remaining);
+
+        if(remaining <= 0) {
+            clearVictoryRankingCountdown();
+            if(!rankingOverlayOpen) openRankingOverlay("postgame");
+        }
+    };
+
+    tick();
+    victoryRankingDelayTimer = setInterval(tick, 250);
+}
+
+function clearSharedAutoTimers() {
+    clearLocalFormationCountdown({ hideBadge: false });
+    clearLocalGoalCountdown({ hideBadge: false });
+    clearPeriodBreakCountdown({ hideBadge: false });
+    clearVictoryRankingCountdown({ hideBadge: false });
+    hideOnlinePhaseTimer();
+}
+
 function startOnlineFormationCountdown() {
     if(!isOnlineMode()) return;
     if(onlineFormationTimer) clearInterval(onlineFormationTimer);
@@ -1990,7 +2152,7 @@ function startOnlineFormationCountdown() {
             if(onlineFormationTimer) clearInterval(onlineFormationTimer);
             onlineFormationTimer = null;
             hideOnlinePhaseTimer();
-            setMessage("⏱ 30s encerrados. Formação atual enviada automaticamente.", 0);
+            setMessage("⏱ 90s encerrados. Formação atual enviada automaticamente.", 0);
             if(formationSetupReason === "halftime") {
                 confirmOnlineHalftimeFormation();
             } else {
@@ -2435,7 +2597,7 @@ function restoreOnlineGameState(state) {
         if(periodBreakActive && periodBreakType === "secondHalf" && winner === null) {
             showPeriodOverlay(
                 "⏱ FIM DO 1º TEMPO",
-                `Intervalo. Placar: ${getScoreLineText()}. Cada jogador terá 30s para organizar seu próprio time.`,
+                `Intervalo. Placar: ${getScoreLineText()}. Cada jogador terá 90s para organizar seu próprio time.`,
                 "⚙ AJUSTAR MINHA FORMAÇÃO",
                 "secondHalf"
             );
@@ -3147,7 +3309,7 @@ function beginOnlineFormationStage() {
         const sideEmoji = localPlayer === 1 ? "🔴" : "🔵";
 
         setMessage(
-            `${sideEmoji} 🌐 SUA FORMAÇÃO: organize apenas ${playerName(localPlayer)} e confirme. O adversário monta o outro lado no dispositivo dele.`,
+            `${sideEmoji} 🌐 SUA FORMAÇÃO: organize apenas ${playerName(localPlayer)} e confirme em até 90 segundos. O adversário monta o outro lado no dispositivo dele.`,
             0
         );
 
@@ -3832,6 +3994,7 @@ function selectSideTeam(teamKey) {
     );
 
     render();
+    startLocalFormationCountdown();
 }
 function selectGameMode(mode) {
     if(mode !== "pvp" && mode !== "cpu" && mode !== "online") return;
@@ -6212,7 +6375,7 @@ async function beginOnlineHalftimeFormationSetup() {
     onlineLobbyState.halftimeHostConfirmed = false;
     onlineLobbyState.halftimeGuestConfirmed = false;
 
-    setMessage(`🌐 INTERVALO: organize ${playerName(formationSetupPlayer)}. Você tem 30 segundos.`, 0);
+    setMessage(`🌐 INTERVALO: organize ${playerName(formationSetupPlayer)}. Você tem 90 segundos.`, 0);
     render();
     startOnlineFormationCountdown();
     startOnlineHalftimePolling();
@@ -6389,14 +6552,16 @@ function beginHalftimeFormationSetup() {
     resetTurnClock();
 
     setMessage(
-        "🔴 INTERVALO: reorganize a formação VERMELHA para o 2º tempo. Expulsos permanecem fora e reservas que já entraram continuam em campo.",
+        `🔴 INTERVALO: reorganize ${playerName(1)} para o 2º tempo. Você tem 90 segundos. Expulsos permanecem fora e reservas que já entraram continuam em campo.`,
         0
     );
 
     render();
+    startLocalFormationCountdown();
 }
 
 function completeFormationSetup() {
+    clearLocalFormationCountdown();
     formationSetupActive = false;
     formationSetupPlayer = null;
     selectedPiece = null;
@@ -6450,6 +6615,8 @@ function confirmFormation() {
         return;
     }
 
+    clearLocalFormationCountdown();
+
     if(isCpuMode() && formationSetupPlayer === CPU_PLAYER) {
         setMessage("🤖 A CPU define a formação REAL MADRID automaticamente.",0);
         return;
@@ -6471,11 +6638,12 @@ function confirmFormation() {
         }
         setMessage(
             formationSetupReason === "halftime"
-                ? "🔵 INTERVALO: agora o REAL MADRID reorganiza suas peças para o 2º tempo."
-                : "🔵 Agora o REAL MADRID define sua formação: GO 1ª-3ª • ZG/LE/LD 4ª-5ª • ME/MD 6ª-7ª • ATK 8ª-9ª.",
+                ? `🔵 INTERVALO: agora ${playerName(0)} reorganiza suas peças para o 2º tempo. Você tem 90 segundos.`
+                : `🔵 Agora ${playerName(0)} define sua formação. Você tem 90 segundos.`,
             0
         );
         render();
+        startLocalFormationCountdown();
         return;
     }
     completeFormationSetup();
@@ -11252,11 +11420,17 @@ function showPeriodOverlay(title, detail, buttonText, breakType) {
         overlay.setAttribute("aria-hidden","false");
     }
 
+    if(breakType === "secondHalf") {
+        startPeriodBreakCountdown();
+    }
+
     updateClockDisplays();
     render();
 }
 
 function hidePeriodOverlay() {
+    clearPeriodBreakCountdown();
+
     const overlay = document.getElementById("periodOverlay");
 
     if(overlay) {
@@ -11364,6 +11538,7 @@ function handleMatchPeriodEnd() {
 function continueMatchPeriod() {
     if(!periodBreakActive || winner !== null) return;
 
+    clearPeriodBreakCountdown();
     const requestedBreakType = periodBreakType;
     hidePeriodOverlay();
 
@@ -11774,6 +11949,7 @@ function registerGoal(scoringPlayer, scoringPiece = null) {
         render();
         scheduleOnlineStatePublish(true);
     } else {
+        startLocalGoalCountdown();
         scheduleGoalCelebration(() => {
             createPieces();
             render();
@@ -11788,6 +11964,8 @@ function continueAfterGoal() {
     if(winner !== null) {
         return;
     }
+
+    clearLocalGoalCountdown();
 
     // A saída após um gol é um novo turno para fins da inteligência da CPU.
     cpuCardUsedThisTurn = false;
@@ -12195,14 +12373,15 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
             // gravado para os DOIS perfis em uma etapa específica do ranking
             // online, evitando contabilização duplicada por dois navegadores.
             setRankingSaveStatus("🌐 Partida online finalizada • validação do ranking online em fase beta.", "pending");
-            setTimeout(() => {
-                if(winner !== null && !rankingOverlayOpen) openRankingOverlay("postgame");
-            }, 900);
         } else {
             registerOfficialMatchToRanking(scoringPlayer);
         }
     } else {
         setRankingSaveStatus("", "");
+    }
+
+    if(matchEnded) {
+        startVictoryRankingCountdown();
     }
 
     const overlay = document.getElementById("victoryOverlay");
@@ -12463,6 +12642,8 @@ document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 function newGame() {
 
+    clearSharedAutoTimers();
+
     // Reiniciar leva novamente à formação: sorteia uma trilha ambiente.
     startMenuMusic({ forceNewTrack: true });
 
@@ -12584,6 +12765,10 @@ function newGame() {
     );
 
     render();
+
+    if(gameMode && !isOnlineMode()) {
+        startLocalFormationCountdown();
+    }
 
 }
 

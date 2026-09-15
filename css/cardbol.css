@@ -2774,6 +2774,25 @@ button.player-chip.expelled.reserve-selected {
         margin-top: 1px;
     }
 
+    /* Em paisagem a roleta fica muito menor por causa do limite em vh.
+       Reposiciona os escudos proporcionalmente para dentro das fatias. */
+    .kickoff-sector-label {
+        transform:
+            rotate(var(--sector-angle))
+            translateY(-56px)
+            rotate(calc(-1 * var(--sector-angle)));
+    }
+
+    .kickoff-sector-logo-wrap {
+        width: 28px;
+        height: 28px;
+        padding: 2px;
+        border-width: 1.5px;
+        box-shadow:
+            0 2px 6px rgba(0,0,0,.42),
+            inset 0 1px 0 rgba(255,255,255,.92);
+    }
+
     .kickoff-button {
         padding: 9px 18px;
         min-width: 200px;

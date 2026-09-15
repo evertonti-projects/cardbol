@@ -1,0 +1,41 @@
+CARDBOL — NOVOS ÁUDIOS
+
+Arquivos esperados dentro de /audios:
+
+audio-efeito-carta7-fogo.mp3
+audio1-menu.mp3
+audio2-menu.mp3
+audio3-menu.mp3
+audio4-menu.mp3
+
+COMPORTAMENTO
+
+1) CARTA 7 — JOGADA ENSAIADA
+O efeito audio-efeito-carta7-fogo.mp3 toca quando o efeito de fogo
+é ativado. No 1x1 online o evento também é enviado ao adversário.
+
+2) MÚSICAS DE MENU
+As quatro músicas são sorteadas aleatoriamente.
+Quando uma termina, outra é sorteada sem repetir imediatamente a anterior.
+
+Tocam durante:
+- identificação/login
+- regras
+- seleção do modo
+- lobby online
+- seleção dos clubes
+- formação inicial
+- intervalo
+- formação do 2º tempo
+
+3) FADE-OUT
+A música faz fade-out ao terminar a formação e iniciar a partida.
+No intervalo, uma nova música pode ser sorteada e faz fade-out quando
+o 2º tempo começa.
+
+Não há SQL novo nesta atualização.
+
+
+AJUSTE:
+- O áudio da Carta 7 agora toca somente quando a carta/vídeo é exibida na tela.
+- Não toca mais no momento da ativação do efeito antes da exibição visual.

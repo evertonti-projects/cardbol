@@ -6488,3 +6488,14 @@ body.cardbol-level-3 .ranking-level-info strong {
             0 0 10px rgba(255,255,255,.10);
     }
 }
+
+
+/* =========================================================
+   CLUBE — FLAMENGO
+========================================================= */
+.team-card.flamengo-card,
+.online-club-card.flamengo-card {
+    background:
+        radial-gradient(circle at 50% 34%, rgba(255,255,255,.12), transparent 42%),
+        linear-gradient(145deg, #b91c1c 0%, #dc2626 50%, #111827 100%);
+}

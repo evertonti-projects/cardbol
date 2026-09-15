@@ -64,6 +64,13 @@ const CLUBS = {
         shortName: "Vasco",
         folder: "vasco",
         cardClass: "vasco-card"
+    },
+    flamengo: {
+        key: "flamengo",
+        name: "FLAMENGO",
+        shortName: "Flamengo",
+        folder: "flamengo",
+        cardClass: "flamengo-card"
     }
 };
 
@@ -74,7 +81,8 @@ const AVAILABLE_TEAM_KEYS = [
     "chelsea",
     "bayern-munique",
     "borussia-dortmund",
-    "vasco"
+    "vasco",
+    "flamengo"
 ];
 
 // O seletor agora possui duas etapas:

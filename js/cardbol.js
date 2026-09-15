@@ -2206,8 +2206,6 @@ function handleOnlineVisualEvent(event) {
         playRemoteMoveGhost(event);
     } else if(event.type === "card") {
         playRemoteCardVideo(event.payload?.cardId);
-    } else if(event.type === "card7fire") {
-        playCard7FireAudio();
     }
 }
 
@@ -8610,13 +8608,6 @@ function activateCard(player, slotIndex, cpuInitiated = false) {
             movesDone:0
         };
 
-        // O áudio entra junto com o início do efeito visual de fogo.
-        playCard7FireAudio();
-
-        if(isOnlineMode() && !onlineApplyingRemoteState && !onlineRemoteVisualPlayback) {
-            emitOnlineVisualEvent("card7fire", { player });
-        }
-
         setMessage(`🎯 “JOGADA ENSAIADA!” — mova ${CARD_7_MOVES} jogadores seus, um por vez, até ${CARD_7_DISTANCE} casas cada.`);
     } else if(cardId === 8) {
         const availableCells = getBlockPlacementCells(player);
@@ -9621,6 +9612,10 @@ function showCard7PlannedPlayVideo(onFinish = null) {
     cardVideoActive = true;
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden", "false");
+
+    // O efeito sonoro da Carta 7 agora toca somente quando o vídeo/arte
+    // da carta é realmente exibido na tela.
+    playCard7FireAudio();
 
     let finished = false;
 

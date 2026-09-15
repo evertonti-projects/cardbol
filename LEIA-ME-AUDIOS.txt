@@ -34,3 +34,8 @@ No intervalo, uma nova música pode ser sorteada e faz fade-out quando
 o 2º tempo começa.
 
 Não há SQL novo nesta atualização.
+
+
+AJUSTE:
+- O áudio da Carta 7 agora toca somente quando a carta/vídeo é exibida na tela.
+- Não toca mais no momento da ativação do efeito antes da exibição visual.

@@ -168,6 +168,32 @@ function getTeamLogo(player) {
     return `${getTeamAssetsBase(player)}/logo.png`;
 }
 
+function getChampionImagePath(player) {
+    return `${getTeamAssetsBase(player)}/champion.png`;
+}
+
+function getLegacyChampionImagePath(player) {
+    return player === 0
+        ? "imagens/geral/img-champion-blue.png"
+        : "imagens/geral/img-champion-red.png";
+}
+
+function setChampionImage(player, altText = "Imagem do time campeão") {
+    const image = document.getElementById("championImage");
+    if(!image) return;
+
+    const clubImage = getChampionImagePath(player);
+    const fallbackImage = getLegacyChampionImagePath(player);
+
+    image.onerror = () => {
+        image.onerror = null;
+        image.src = fallbackImage;
+    };
+
+    image.alt = altText;
+    image.src = clubImage;
+}
+
 function getScoreLineText() {
     return `${playerName(1)} ${scoreRed} × ${scoreBlue} ${playerName(0)}`;
 }
@@ -11545,6 +11571,7 @@ function clearGoalCelebrationVisuals(hideOverlay = false) {
 
     const championImage = document.getElementById("championImage");
     if(championImage) {
+        championImage.onerror = null;
         championImage.removeAttribute("src");
     }
 }
@@ -12230,8 +12257,6 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
     if(matchEnded && (matchEndReason === "interruptions" || matchEndReason === "reconnect_timeout")) {
         playFinalVictoryAudio();
 
-        const championImage = document.getElementById("championImage");
-
         overlay.classList.remove("goal-blue", "goal-red");
         overlay.classList.add(
             "show",
@@ -12242,12 +12267,10 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
             isBlue ? "goal-blue" : "goal-red"
         );
 
-        if(championImage) {
-            championImage.src = isBlue
-                ? "imagens/geral/img-champion-blue.png"
-                : "imagens/geral/img-champion-red.png";
-            championImage.alt = `Imagem do ${name}, vencedor por abandono`;
-        }
+        setChampionImage(
+            scoringPlayer,
+            `Imagem comemorativa do ${name}, vencedor por abandono`
+        );
 
         if(goalIdentity) {
             goalIdentity.setAttribute("aria-hidden", "true");
@@ -12270,8 +12293,6 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
     if(matchEnded && (matchEndReason === "time" || matchEndReason === "pieces")) {
         playFinalVictoryAudio();
 
-        const championImage = document.getElementById("championImage");
-
         overlay.classList.remove(
             "goal-blue","goal-red"
         );
@@ -12285,13 +12306,10 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
             isBlue ? "goal-blue" : "goal-red"
         );
 
-        if(championImage) {
-            championImage.src = isBlue
-                ? "imagens/geral/img-champion-blue.png"
-                : "imagens/geral/img-champion-red.png";
-
-            championImage.alt = `Imagem do ${name}, campeão do CardBol`;
-        }
+        setChampionImage(
+            scoringPlayer,
+            `Imagem comemorativa do ${name}, campeão do CardBol`
+        );
 
         if(goalIdentity) {
             goalIdentity.setAttribute("aria-hidden", "true");
@@ -12308,15 +12326,36 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
         return;
     }
 
-    // Vitória por redução do elenco não é um gol, então mantém a tela tradicional.
+    // Vitória por redução do elenco também usa o card comemorativo
+    // específico do clube campeão.
     if(matchEnded && matchEndReason === "minimumPlayers") {
         playFinalVictoryAudio();
-        overlay.classList.add("show");
+
+        overlay.classList.remove("goal-blue", "goal-red");
+        overlay.classList.add(
+            "show",
+            "goal-mode",
+            "match-mode",
+            "champion-mode",
+            "goal-ready",
+            isBlue ? "goal-blue" : "goal-red"
+        );
+
+        setChampionImage(
+            scoringPlayer,
+            `Imagem comemorativa do ${name}, campeão do CardBol`
+        );
+
+        if(goalIdentity) {
+            goalIdentity.setAttribute("aria-hidden", "true");
+        }
+
         title.textContent = `${emoji} 🏆 ${name} VENCEU!`;
         const defeatedName = playerName(scoringPlayer === 0 ? 1 : 0);
         text.textContent =
             `Fim de jogo! ${defeatedName} ficou reduzido a GO + 1 jogador. Placar: ${getScoreLineText()}.`;
         button.textContent = "NOVA PARTIDA • 0 × 0";
+        launchChampionConfetti(scoringPlayer);
         return;
     }
 
@@ -12342,19 +12381,15 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
 
     if(matchEnded) {
         scheduleGoalCelebration(() => {
-            const championImage = document.getElementById("championImage");
-
             // Remove os confetes discretos do gol e inicia a celebração do título.
             document.getElementById("goalFxLayer")?.remove();
 
             overlay.classList.add("match-mode", "champion-mode", "goal-ready");
 
-            if(championImage) {
-                championImage.src = isBlue
-                    ? "imagens/geral/img-champion-blue.png"
-                    : "imagens/geral/img-champion-red.png";
-                championImage.alt = `Troféu do ${name}, campeão do CardBol`;
-            }
+            setChampionImage(
+                scoringPlayer,
+                `Imagem comemorativa do ${name}, campeão do CardBol`
+            );
 
             title.textContent = `${emoji} 🏆 CAMPEÃO!`;
             text.textContent =

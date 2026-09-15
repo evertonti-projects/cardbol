@@ -12570,6 +12570,27 @@ function getKickoffSectors() {
     ];
 }
 
+function renderKickoffWheelVisuals() {
+    const wheel = document.getElementById("kickoffWheel");
+    if(!wheel) return;
+
+    const sectors = getKickoffSectors();
+
+    wheel.innerHTML = sectors.map((sector, index) => {
+        const sectorAngle = 22.5 + (index * 45);
+        const logo = getTeamLogo(sector.player);
+        const alt = `Escudo do ${teamShortName(sector.player)}`;
+
+        return `
+            <span class="kickoff-sector-label" style="--sector-angle: ${sectorAngle}deg;">
+                <span class="kickoff-sector-logo-wrap">
+                    <img class="kickoff-sector-logo" src="${logo}" alt="${alt}">
+                </span>
+            </span>
+        `;
+    }).join("");
+}
+
 function showKickoffRoulette() {
     // Formação terminou: a trilha de menu sai suavemente antes
     // do áudio específico da roleta e do início da partida.
@@ -12589,6 +12610,8 @@ function showKickoffRoulette() {
     overlay.classList.remove("finishing");
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden", "false");
+
+    renderKickoffWheelVisuals();
 
     wheel.style.transition = "none";
     wheel.style.transform = "rotate(0deg)";

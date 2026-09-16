@@ -8111,3 +8111,141 @@ body.cardbol-level-3 .ranking-level-info strong {
     .team-select-grid-right > *:nth-child(5) { --curve-shift: -4px !important; }
     .team-select-grid-right > *:nth-child(6) { --curve-shift: -2px !important; }
 }
+
+
+/* =========================================================
+   MENU DE TIMES — AJUSTES PEDIDOS PELO USUÁRIO
+   Retrato: 12 itens na coluna direita.
+   Paisagem: ícones maiores e mais para o centro.
+========================================================= */
+@media (orientation: portrait) and (max-width: 700px) {
+    .team-select-layout {
+        width: 100% !important;
+        grid-template-columns: 1fr 80px !important;
+        gap: 0 !important;
+        max-height: calc(100dvh - 128px) !important;
+        align-items: start !important;
+    }
+
+    .team-select-grid-left {
+        display: none !important;
+    }
+
+    .team-select-center {
+        grid-column: 1 !important;
+        min-height: calc(100dvh - 128px) !important;
+    }
+
+    .team-select-grid-right {
+        grid-column: 2 !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        justify-items: end !important;
+        align-content: start !important;
+        gap: 2px !important;
+        padding-top: 2px !important;
+        padding-right: 2px !important;
+    }
+
+    .team-select-grid-right > * {
+        --curve-shift: 0px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 70px !important;
+        min-width: 70px !important;
+        padding: 1px 0 2px !important;
+    }
+
+    .team-card-logo {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    .team-card-label {
+        max-width: 68px !important;
+        font-size: 5.8px !important;
+        line-height: 1.02 !important;
+        letter-spacing: .01em !important;
+    }
+
+    .team-card-role {
+        font-size: 4.2px !important;
+        line-height: 1 !important;
+    }
+
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 5.5px !important;
+        line-height: 1 !important;
+    }
+
+    .team-select-title {
+        margin-top: 5px !important;
+        font-size: 18px !important;
+    }
+
+    .team-select-subtitle {
+        font-size: 7px !important;
+        margin-bottom: 3px !important;
+    }
+
+    .team-select-footer {
+        font-size: 6px !important;
+        line-height: 1.08 !important;
+        margin-top: 3px !important;
+        padding: 0 6px !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .team-select-layout {
+        width: min(92vw, 980px) !important;
+        margin: 0 auto !important;
+        grid-template-columns: 148px 1fr 148px !important;
+        gap: 12px !important;
+        max-height: calc(100dvh - 96px) !important;
+    }
+
+    .team-select-grid-side {
+        gap: 6px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 76px !important;
+        min-width: 76px !important;
+        padding: 1px 0 2px !important;
+    }
+
+    .team-card-logo {
+        width: 25px !important;
+        height: 25px !important;
+    }
+
+    .team-card-label {
+        max-width: 74px !important;
+        font-size: 7px !important;
+        line-height: 1.02 !important;
+    }
+
+    .team-card-role,
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 4.8px !important;
+    }
+
+    .team-select-grid-left > *:nth-child(1) { --curve-shift: 8px !important; }
+    .team-select-grid-left > *:nth-child(2) { --curve-shift: 12px !important; }
+    .team-select-grid-left > *:nth-child(3) { --curve-shift: 18px !important; }
+    .team-select-grid-left > *:nth-child(4) { --curve-shift: 18px !important; }
+    .team-select-grid-left > *:nth-child(5) { --curve-shift: 12px !important; }
+    .team-select-grid-left > *:nth-child(6) { --curve-shift: 8px !important; }
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -8px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -12px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -18px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -18px !important; }
+    .team-select-grid-right > *:nth-child(5) { --curve-shift: -12px !important; }
+    .team-select-grid-right > *:nth-child(6) { --curve-shift: -8px !important; }
+}

@@ -4131,9 +4131,16 @@ function populateTeamSelectGrid() {
     while(leftItems.length < 6) leftItems.push("__locked__");
     while(rightItems.length < 6) rightItems.push("__locked__");
 
+    const isPortraitMobileTeamMenu = window.matchMedia("(orientation: portrait) and (max-width: 700px)").matches;
+
     if(leftGrid && rightGrid) {
-        leftGrid.innerHTML = leftItems.map(renderItem).join("");
-        rightGrid.innerHTML = rightItems.map(renderItem).join("");
+        if(isPortraitMobileTeamMenu) {
+            leftGrid.innerHTML = "";
+            rightGrid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");
+        } else {
+            leftGrid.innerHTML = leftItems.map(renderItem).join("");
+            rightGrid.innerHTML = rightItems.map(renderItem).join("");
+        }
         if(grid) grid.innerHTML = "";
     } else if(grid) {
         grid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");

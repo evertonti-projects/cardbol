@@ -1301,7 +1301,9 @@ function showCardBolHub() {
             : "👤 JOGADOR";
     }
 
-    startMenuMusic();
+    // A Central de Jogos também deve permanecer silenciosa.
+    // A trilha de menu só começa a partir da tela de regras.
+    stopMenuMusicImmediately();
     hub.classList.add("show");
     hub.setAttribute("aria-hidden", "false");
 }
@@ -1323,7 +1325,9 @@ function launchCardBolFromHub() {
     }
 
     hideCardBolHub();
-    fadeOutMenuMusic(450);
+    // Garante silêncio entre a Central de Jogos e a abertura.
+    // A música de menu será iniciada por showRulesOverlay().
+    stopMenuMusicImmediately();
 
     screen.classList.remove("closing");
     screen.style.display = "flex";

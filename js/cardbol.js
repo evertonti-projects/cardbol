@@ -4132,18 +4132,32 @@ function populateTeamSelectGrid() {
     while(rightItems.length < 6) rightItems.push("__locked__");
 
     const isPortraitMobileTeamMenu = window.matchMedia("(orientation: portrait) and (max-width: 700px)").matches;
+    const portraitOrderedItems = [
+        "arsenal",
+        "barcelona",
+        "bayern-munique",
+        "borussia-dortmund",
+        "chelsea",
+        "flamengo",
+        "real-madrid",
+        "vasco",
+        "__locked__",
+        "__locked__",
+        "__locked__",
+        "__locked__"
+    ];
 
     if(leftGrid && rightGrid) {
         if(isPortraitMobileTeamMenu) {
             leftGrid.innerHTML = "";
-            rightGrid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");
+            rightGrid.innerHTML = portraitOrderedItems.map(renderItem).join("");
         } else {
             leftGrid.innerHTML = leftItems.map(renderItem).join("");
             rightGrid.innerHTML = rightItems.map(renderItem).join("");
         }
         if(grid) grid.innerHTML = "";
     } else if(grid) {
-        grid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");
+        grid.innerHTML = (isPortraitMobileTeamMenu ? portraitOrderedItems : [...leftItems, ...rightItems]).map(renderItem).join("");
     }
 
     document.querySelectorAll("#teamSelectOverlay .team-card").forEach(card => {

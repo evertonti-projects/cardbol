@@ -8249,3 +8249,161 @@ body.cardbol-level-3 .ranking-level-info strong {
     .team-select-grid-right > *:nth-child(5) { --curve-shift: -12px !important; }
     .team-select-grid-right > *:nth-child(6) { --curve-shift: -8px !important; }
 }
+
+
+/* =========================================================
+   MENU DE TIMES — REAJUSTE FINAL MOBILE
+   Retrato: 12 opções maiores à direita em ordem alfabética.
+   Paisagem mobile: 6/6 maiores e mais próximas do centro.
+========================================================= */
+@media (orientation: portrait) and (max-width: 700px) {
+    .team-select-panel,
+    .team-select-panel-stadium {
+        padding: 6px 4px 10px !important;
+        grid-template-rows: 1fr auto auto auto !important;
+    }
+
+    .team-select-layout {
+        width: 100% !important;
+        grid-template-columns: 1fr 100px !important;
+        gap: 0 !important;
+        max-height: calc(100dvh - 122px) !important;
+        min-height: calc(100dvh - 122px) !important;
+        align-items: stretch !important;
+    }
+
+    .team-select-grid-left {
+        display: none !important;
+    }
+
+    .team-select-center {
+        grid-column: 1 !important;
+        min-height: calc(100dvh - 122px) !important;
+    }
+
+    .team-select-grid-right {
+        grid-column: 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        height: calc(100dvh - 122px) !important;
+        gap: 0 !important;
+        padding: 0 2px 0 0 !important;
+    }
+
+    .team-select-grid-right > * {
+        --curve-shift: 0px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 96px !important;
+        min-width: 96px !important;
+        padding: 2px 0 3px !important;
+    }
+
+    .team-card-logo {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    .team-card-label {
+        max-width: 92px !important;
+        font-size: 8px !important;
+        line-height: 1.03 !important;
+        letter-spacing: .01em !important;
+    }
+
+    .team-card-role {
+        font-size: 5.5px !important;
+        line-height: 1 !important;
+    }
+
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 7px !important;
+        line-height: 1 !important;
+    }
+
+    .team-select-title {
+        margin-top: 4px !important;
+        font-size: 17px !important;
+    }
+
+    .team-select-subtitle {
+        font-size: 7px !important;
+        margin-bottom: 3px !important;
+    }
+
+    .team-select-footer {
+        font-size: 6px !important;
+        line-height: 1.08 !important;
+        margin-top: 3px !important;
+        padding: 0 6px !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .team-select-layout {
+        width: min(94vw, 1080px) !important;
+        margin: 0 auto !important;
+        grid-template-columns: 168px 1fr 168px !important;
+        gap: 14px !important;
+        max-height: calc(100dvh - 96px) !important;
+    }
+
+    .team-select-grid-side {
+        gap: 6px !important;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 90px !important;
+        min-width: 90px !important;
+        padding: 2px 0 3px !important;
+    }
+
+    .team-card-logo {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    .team-card-label {
+        max-width: 86px !important;
+        font-size: 8px !important;
+        line-height: 1.03 !important;
+    }
+
+    .team-card-role,
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 5.5px !important;
+        line-height: 1 !important;
+    }
+
+    .team-select-title {
+        font-size: 19px !important;
+    }
+
+    .team-select-subtitle {
+        font-size: 7px !important;
+    }
+
+    .team-select-footer {
+        font-size: 5px !important;
+    }
+
+    .team-select-grid-left > *:nth-child(1) { --curve-shift: 12px !important; }
+    .team-select-grid-left > *:nth-child(2) { --curve-shift: 18px !important; }
+    .team-select-grid-left > *:nth-child(3) { --curve-shift: 26px !important; }
+    .team-select-grid-left > *:nth-child(4) { --curve-shift: 26px !important; }
+    .team-select-grid-left > *:nth-child(5) { --curve-shift: 18px !important; }
+    .team-select-grid-left > *:nth-child(6) { --curve-shift: 12px !important; }
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -12px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -18px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -26px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -26px !important; }
+    .team-select-grid-right > *:nth-child(5) { --curve-shift: -18px !important; }
+    .team-select-grid-right > *:nth-child(6) { --curve-shift: -12px !important; }
+}

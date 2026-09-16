@@ -383,6 +383,8 @@ const card10VideoPaths = [
 // Comentários/narração em destaque; efeitos do jogo reduzidos.
 // ============================================================
 const EFFECT_AUDIO_VOLUME = 0.25;
+const DICE_AUDIO_VOLUME = 0.15;
+const GOAL_AUDIO_VOLUME = 0.15;
 const COMMENTARY_AUDIO_VOLUME = 1.00;
 const MENU_MUSIC_VOLUME = 0.25;
 
@@ -435,12 +437,12 @@ const goalCelebrationAudios = [
 ];
 goalCelebrationAudios.forEach(audio => {
     audio.preload = "auto";
-    audio.volume = EFFECT_AUDIO_VOLUME;
+    audio.volume = GOAL_AUDIO_VOLUME;
 });
 
 const finalVictoryAudio = new Audio("audios/audio-goal-5final.mp3");
 finalVictoryAudio.preload = "auto";
-finalVictoryAudio.volume = EFFECT_AUDIO_VOLUME;
+finalVictoryAudio.volume = GOAL_AUDIO_VOLUME;
 
 // ============================================================
 // COMENTARISTA DO CARDBOL
@@ -11193,7 +11195,7 @@ let nextDiceRollAudioIndex = 0;
 
 diceRollAudios.forEach(audio => {
     audio.preload = "auto";
-    audio.volume = EFFECT_AUDIO_VOLUME;
+    audio.volume = DICE_AUDIO_VOLUME;
 });
 
 function playNextDiceRollAudio() {
@@ -11205,7 +11207,7 @@ function playNextDiceRollAudio() {
     try {
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = EFFECT_AUDIO_VOLUME;
+        audio.volume = DICE_AUDIO_VOLUME;
         const playPromise = audio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -12705,7 +12707,7 @@ function playNextGoalCelebrationAudio() {
 
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = EFFECT_AUDIO_VOLUME;
+        audio.volume = GOAL_AUDIO_VOLUME;
         const playPromise = audio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -12724,7 +12726,7 @@ function playFinalVictoryAudio() {
 
         finalVictoryAudio.pause();
         finalVictoryAudio.currentTime = 0;
-        finalVictoryAudio.volume = EFFECT_AUDIO_VOLUME;
+        finalVictoryAudio.volume = GOAL_AUDIO_VOLUME;
         const playPromise = finalVictoryAudio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});

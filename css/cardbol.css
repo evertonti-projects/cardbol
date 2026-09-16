@@ -6932,3 +6932,399 @@ body.cardbol-level-3 .ranking-level-info strong {
     .cardbol-game-action { padding: 8px 10px; font-size: 8px; }
     .cardbol-hub-footer { padding-top: 8px; font-size: 7px; }
 }
+
+/* =========================================================
+   CARDBOL — NOVO LAYOUT MOBILE EM MODO RETRATO
+   Campo realmente vertical: adversário em cima, jogador embaixo.
+   A versão desktop/paisagem permanece inalterada.
+========================================================= */
+@media (max-width: 900px) and (orientation: portrait) {
+    html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden !important;
+    }
+
+    .game-container {
+        width: 100vw !important;
+        height: 100dvh !important;
+        min-height: 100dvh !important;
+        padding: 4px !important;
+        gap: 4px !important;
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) auto !important;
+        overflow: hidden !important;
+    }
+
+    /* Cabeçalho mais compacto para entregar a maior parte da tela ao campo. */
+    .game-header {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-areas: "top dice" !important;
+        gap: 4px !important;
+        min-height: 0 !important;
+    }
+
+    .brand-panel {
+        display: none !important;
+    }
+
+    .top-panel {
+        grid-area: top !important;
+        min-width: 0 !important;
+        padding: 3px 4px !important;
+        gap: 3px !important;
+        grid-template-columns: minmax(60px, 1fr) auto minmax(60px, 1fr) !important;
+    }
+
+    .game-header > .dice-area {
+        grid-area: dice !important;
+        padding: 3px 4px !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+    }
+
+    .player {
+        padding: 4px 3px !important;
+        font-size: 8px !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .electronic-scoreboard {
+        min-width: 108px !important;
+        padding: 3px 5px !important;
+    }
+
+    .score-label { font-size: 6px !important; }
+    .score-number { min-width: 21px !important; font-size: 17px !important; padding: 1px 3px !important; }
+    .score-separator { font-size: 13px !important; }
+    .score-club-logo { width: 20px !important; height: 20px !important; }
+    .match-clock-row { gap: 4px !important; margin: 0 !important; }
+    .match-phase-label { font-size: 6px !important; }
+    .match-clock { min-width: 38px !important; font-size: 10px !important; }
+    .turn { font-size: 6px !important; letter-spacing: .15px !important; }
+
+    .dice {
+        width: 34px !important;
+        height: 34px !important;
+        flex-basis: 34px !important;
+        border-width: 2px !important;
+        border-radius: 8px !important;
+        padding: 4px !important;
+    }
+
+    .dice .pip { width: 5px !important; height: 5px !important; }
+    .dice.empty::after { font-size: 19px !important; }
+    .dice-button { padding: 6px 7px !important; font-size: 8px !important; border-radius: 7px !important; }
+    .dice-info { min-width: 0 !important; font-size: 6px !important; line-height: 1.05 !important; }
+    .dice-value { font-size: 14px !important; }
+
+    /* Estrutura: adversário -> campo vertical -> jogador local. */
+    .match-stage {
+        min-height: 0 !important;
+        height: 100% !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: 72px minmax(0, 1fr) 72px !important;
+        grid-template-areas:
+            "blue"
+            "pitch"
+            "red" !important;
+        gap: 4px !important;
+        align-items: stretch !important;
+        justify-items: stretch !important;
+        overflow: hidden !important;
+    }
+
+    /* Se o jogador local online for o lado azul, inverte os painéis. */
+    .game-container.portrait-local-blue .match-stage {
+        grid-template-areas:
+            "red"
+            "pitch"
+            "blue" !important;
+    }
+
+    .red-side { grid-area: red !important; }
+    .blue-side { grid-area: blue !important; }
+
+    /* Faixas compactas de cada time: nome | banco | cartas. */
+    .team-side {
+        width: 100% !important;
+        height: 72px !important;
+        min-height: 0 !important;
+        padding: 3px !important;
+        gap: 3px !important;
+        display: grid !important;
+        grid-template-columns: minmax(58px, .55fr) minmax(105px, 1fr) minmax(0, 1.45fr) !important;
+        grid-template-rows: minmax(0, 1fr) !important;
+        align-items: stretch !important;
+        overflow: hidden !important;
+        border-radius: 9px !important;
+    }
+
+    .team-side.red-side {
+        border-left: 1px solid var(--panel-border) !important;
+        border-bottom: 3px solid rgba(248,113,113,.8) !important;
+    }
+
+    .team-side.blue-side {
+        border-right: 1px solid var(--panel-border) !important;
+        border-top: 3px solid rgba(96,165,250,.8) !important;
+    }
+
+    .game-container.portrait-local-blue .team-side.red-side {
+        border-bottom: 1px solid var(--panel-border) !important;
+        border-top: 3px solid rgba(248,113,113,.8) !important;
+    }
+
+    .game-container.portrait-local-blue .team-side.blue-side {
+        border-top: 1px solid var(--panel-border) !important;
+        border-bottom: 3px solid rgba(96,165,250,.8) !important;
+    }
+
+    .side-team-title {
+        min-height: 0 !important;
+        height: 100% !important;
+        padding: 3px !important;
+        font-size: 7px !important;
+        line-height: 1.1 !important;
+        white-space: normal !important;
+        overflow: hidden !important;
+    }
+
+    .team-side .squad-box,
+    .team-side .card-hand {
+        height: 100% !important;
+        min-height: 0 !important;
+        padding: 2px !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .team-side .squad-title,
+    .team-side .card-hand-title {
+        margin: 0 0 2px !important;
+        font-size: 6px !important;
+        line-height: 1 !important;
+    }
+
+    .team-side .squad-rows {
+        height: calc(100% - 8px) !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 2px !important;
+    }
+
+    .team-side .squad-section {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        padding: 1px !important;
+        overflow: hidden !important;
+    }
+
+    .team-side .squad-label {
+        margin: 0 !important;
+        font-size: 5px !important;
+        line-height: 1 !important;
+    }
+
+    .team-side .player-chips,
+    .team-side .bench-carousel {
+        height: 34px !important;
+        min-height: 34px !important;
+        gap: 1px !important;
+    }
+
+    .bench-carousel-item {
+        width: 30px !important;
+        height: 30px !important;
+    }
+
+    .bench-carousel-arrow {
+        width: 14px !important;
+        height: 20px !important;
+        font-size: 8px !important;
+    }
+
+    .team-side .card-slots {
+        height: calc(100% - 8px) !important;
+        min-height: 0 !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        grid-template-rows: minmax(0, 1fr) !important;
+        gap: 2px !important;
+    }
+
+    .team-side .card-slot {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+    }
+
+    .team-side .tactical-card .card-number,
+    .team-side .tactical-card .card-name { font-size: 6px !important; }
+    .team-side .tactical-card .card-effect { display: none !important; }
+    .side-card-rule { display: none !important; }
+
+    /* CAMPO EM PÉ: 11 colunas, 18 linhas + um gol em cada extremidade. */
+    .pitch-shell {
+        grid-area: pitch !important;
+        width: auto !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        aspect-ratio: 11 / 20 !important;
+        justify-self: center !important;
+        align-self: center !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: 1fr 18fr 1fr !important;
+        grid-template-areas:
+            "topgoal"
+            "field"
+            "bottomgoal" !important;
+        border-width: 3px !important;
+        border-radius: 11px !important;
+    }
+
+    .board {
+        grid-area: field !important;
+        grid-template-columns: repeat(11, minmax(0, 1fr)) !important;
+        grid-template-rows: repeat(18, minmax(0, 1fr)) !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-top: 2px solid white !important;
+        border-bottom: 2px solid white !important;
+        background:
+            linear-gradient(to bottom, transparent 49.8%, rgba(255,255,255,.85) 49.8%, rgba(255,255,255,.85) 50.2%, transparent 50.2%),
+            linear-gradient(rgba(255,255,255,.05), rgba(255,255,255,.05)) !important;
+    }
+
+    .board::after {
+        background:
+            linear-gradient(to bottom,
+                transparent calc(50% - 2px),
+                rgba(255,255,255,.95) calc(50% - 2px),
+                rgba(255,255,255,.95) calc(50% + 2px),
+                transparent calc(50% + 2px)
+            ),
+            linear-gradient(to bottom,
+                transparent calc(16.6667% - 2px),
+                rgba(250,204,21,.95) calc(16.6667% - 2px),
+                rgba(250,204,21,.95) calc(16.6667% + 2px),
+                transparent calc(16.6667% + 2px)
+            ),
+            linear-gradient(to bottom,
+                transparent calc(83.3333% - 2px),
+                rgba(250,204,21,.95) calc(83.3333% - 2px),
+                rgba(250,204,21,.95) calc(83.3333% + 2px),
+                transparent calc(83.3333% + 2px)
+            ) !important;
+    }
+
+    /* Por padrão: azul/adversário em cima e vermelho/jogador embaixo. */
+    .blue-goal-line { grid-area: topgoal !important; }
+    .red-goal-line { grid-area: bottomgoal !important; }
+
+    /* Online com jogador local azul: vermelho sobe e azul desce. */
+    .game-container.portrait-local-blue .red-goal-line { grid-area: topgoal !important; }
+    .game-container.portrait-local-blue .blue-goal-line { grid-area: bottomgoal !important; }
+
+    .goal-line {
+        width: 100% !important;
+        height: 100% !important;
+        display: grid !important;
+        grid-template-columns: repeat(11, minmax(0, 1fr)) !important;
+        grid-template-rows: minmax(0, 1fr) !important;
+    }
+
+    .goal-cell {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        border-top: 0 !important;
+        border-bottom: 0 !important;
+        border-left: 1px solid rgba(255,255,255,.72) !important;
+        border-right: 1px solid rgba(255,255,255,.72) !important;
+        font-size: clamp(8px, 2.8vw, 12px) !important;
+    }
+
+    .goal-cell:nth-child(1) { grid-row: 1 !important; grid-column: 5 !important; }
+    .goal-cell:nth-child(2) { grid-row: 1 !important; grid-column: 6 !important; }
+    .goal-cell:nth-child(3) { grid-row: 1 !important; grid-column: 7 !important; }
+
+    .red-goal-line .goal-cell {
+        background: linear-gradient(180deg, rgba(153,27,27,.88), rgba(239,68,68,.78)) !important;
+    }
+
+    .blue-goal-line .goal-cell {
+        background: linear-gradient(180deg, rgba(59,130,246,.78), rgba(30,64,175,.9)) !important;
+    }
+
+    /* Linhas de saída acompanham quem está em cima/embaixo. */
+    .red-start { box-shadow: inset 0 -4px 0 #f87171 !important; }
+    .blue-start { box-shadow: inset 0 4px 0 #60a5fa !important; }
+    .game-container.portrait-local-blue .red-start { box-shadow: inset 0 4px 0 #f87171 !important; }
+    .game-container.portrait-local-blue .blue-start { box-shadow: inset 0 -4px 0 #60a5fa !important; }
+
+    .piece {
+        width: 88% !important;
+        max-height: 88% !important;
+        left: 6% !important;
+        top: 6% !important;
+    }
+
+    .piece-label { font-size: clamp(5px, 1.75vw, 8px) !important; }
+
+    /* Rodapé de comandos compacto e sem rolagem da página. */
+    .info-panel {
+        padding: 3px !important;
+        gap: 3px !important;
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        grid-template-areas:
+            "message message message message"
+            "formation fullscreen ranking newgame" !important;
+        align-items: stretch !important;
+    }
+
+    .message {
+        grid-area: message !important;
+        min-height: 24px !important;
+        padding: 4px 6px !important;
+        font-size: 8px !important;
+        line-height: 1.15 !important;
+    }
+
+    .formation-confirm-button { grid-area: formation !important; }
+    .fullscreen-button { grid-area: fullscreen !important; }
+    .ranking-game-button { grid-area: ranking !important; }
+    .new-game { grid-area: newgame !important; }
+
+    .formation-confirm-button,
+    .fullscreen-button,
+    .ranking-game-button,
+    .new-game {
+        min-width: 0 !important;
+        padding: 6px 3px !important;
+        font-size: 7px !important;
+        white-space: normal !important;
+        line-height: 1.05 !important;
+    }
+}
+
+/* Em aparelhos muito baixos, reduz as faixas dos times para preservar o campo. */
+@media (max-width: 900px) and (orientation: portrait) and (max-height: 740px) {
+    .match-stage {
+        grid-template-rows: 60px minmax(0, 1fr) 60px !important;
+    }
+
+    .team-side { height: 60px !important; }
+    .team-side .squad-title,
+    .team-side .card-hand-title { display: none !important; }
+    .team-side .squad-rows,
+    .team-side .card-slots { height: 100% !important; }
+    .team-side .player-chips,
+    .team-side .bench-carousel { height: 28px !important; min-height: 28px !important; }
+    .bench-carousel-item { width: 25px !important; height: 25px !important; }
+}

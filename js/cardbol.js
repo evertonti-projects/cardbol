@@ -8103,6 +8103,79 @@ function animatePieceAlongPath(piece, path, onComplete) {
 }
 
 // ============================================================
+// ORIENTAÇÃO VISUAL DO CAMPO
+// - desktop/paisagem: 18 colunas x 11 linhas (campo deitado)
+// - celular retrato: 11 colunas x 18 linhas (campo em pé)
+//   com o jogador local embaixo e o adversário em cima.
+// A lógica interna continua 11 x 18; só mudamos a posição visual.
+// ============================================================
+
+let boardVisualLayoutKey = "";
+
+function isPortraitBoardLayout() {
+    return window.matchMedia("(max-width: 900px) and (orientation: portrait)").matches;
+}
+
+function getPortraitBottomPlayer() {
+    if(
+        isOnlineMode() &&
+        onlineLobbyState &&
+        (onlineLobbyState.callerSide === "host" || onlineLobbyState.callerSide === "guest")
+    ) {
+        return getOnlineLocalPlayerIndex();
+    }
+
+    // CPU: o humano é o player 1 (vermelho).
+    // PvP local: mantém o player 1 embaixo e o player 0 em cima.
+    return HUMAN_PLAYER;
+}
+
+function applyBoardVisualOrientation(force = false) {
+    const root = document.getElementById("gameRoot");
+    const portrait = isPortraitBoardLayout();
+    const bottomPlayer = portrait ? getPortraitBottomPlayer() : HUMAN_PLAYER;
+    const layoutKey = portrait ? `portrait-${bottomPlayer}` : "landscape";
+
+    if(!force && boardVisualLayoutKey === layoutKey) return;
+    boardVisualLayoutKey = layoutKey;
+
+    root?.classList.toggle("portrait-board", portrait);
+    root?.classList.toggle("portrait-local-blue", portrait && bottomPlayer === 0);
+
+    if(!boardCellsCache.length) return;
+
+    for(let row = 0; row < ROWS; row++) {
+        for(let col = 0; col < COLS; col++) {
+            const cell = boardCellsCache[row * COLS + col];
+            if(!cell) continue;
+
+            if(portrait) {
+                // No retrato, a coordenada lógica COL vira coluna visual e
+                // ROW vira linha visual. Invertemos ROW quando o vermelho
+                // está embaixo; no online, isso acompanha o jogador local.
+                cell.style.gridColumn = String(col + 1);
+                cell.style.gridRow = String(
+                    bottomPlayer === 1
+                        ? ROWS - row
+                        : row + 1
+                );
+            } else {
+                // Orientação horizontal original.
+                cell.style.gridColumn = String(row + 1);
+                cell.style.gridRow = String(col + 1);
+            }
+        }
+    }
+}
+
+function scheduleBoardVisualOrientation() {
+    window.requestAnimationFrame(() => {
+        boardVisualLayoutKey = "";
+        applyBoardVisualOrientation(true);
+    });
+}
+
+// ============================================================
 // CRIAR TABULEIRO
 // ============================================================
 
@@ -8202,6 +8275,9 @@ function createBoard() {
 
     redGoalCellsCache = Array.from(document.querySelectorAll("#redGoal .goal-cell"));
     blueGoalCellsCache = Array.from(document.querySelectorAll("#blueGoal .goal-cell"));
+
+    boardVisualLayoutKey = "";
+    applyBoardVisualOrientation(true);
 
 }
 
@@ -12158,6 +12234,10 @@ function setTurnDisplay(label) {
 
 function updateInterface() {
 
+    // Mantém a orientação correta quando o aparelho gira e, no modo online,
+    // quando descobrimos se o jogador local é o lado vermelho ou azul.
+    applyBoardVisualOrientation();
+
     updateScoreboard();
     updateCatimbaTeamIndicators();
     updateClockDisplays();
@@ -13355,6 +13435,10 @@ if(playerPinInput) {
 createFormationSetupPieces();
 
 createBoard();
+
+// Reorganiza o campo imediatamente ao girar/redimensionar o celular.
+window.addEventListener("resize", scheduleBoardVisualOrientation, { passive: true });
+window.addEventListener("orientationchange", scheduleBoardVisualOrientation, { passive: true });
 
 createGoalHandlers();
 

@@ -8407,3 +8407,131 @@ body.cardbol-level-3 .ranking-level-info strong {
     .team-select-grid-right > *:nth-child(5) { --curve-shift: -18px !important; }
     .team-select-grid-right > *:nth-child(6) { --curve-shift: -12px !important; }
 }
+
+
+/* =========================================================
+   MENU DE TIMES INTERATIVO — PAISAGEM MOBILE
+========================================================= */
+.team-select-mobile-nav {
+    display: none;
+}
+
+.team-select-mobile-nav.show {
+    display: flex;
+}
+
+.team-select-nav-button {
+    border: none;
+    border-radius: 999px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-weight: 1000;
+    font-size: 14px;
+    color: #fff;
+    background: rgba(15,23,42,.74);
+    box-shadow: 0 8px 18px rgba(0,0,0,.34);
+}
+
+.team-select-nav-button:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .team-select-layout {
+        position: relative;
+        width: min(94vw, 960px) !important;
+        margin: 0 auto !important;
+        grid-template-columns: 1fr 126px !important;
+        gap: 0 !important;
+        max-height: calc(100dvh - 96px) !important;
+        min-height: calc(100dvh - 96px) !important;
+        align-items: stretch !important;
+    }
+
+    .team-select-grid-left {
+        display: none !important;
+    }
+
+    .team-select-center {
+        grid-column: 1 !important;
+        min-height: calc(100dvh - 96px) !important;
+    }
+
+    .team-select-grid-right {
+        grid-column: 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: flex-end !important;
+        gap: 12px !important;
+        padding: 0 18px 0 0 !important;
+        min-height: calc(100dvh - 96px) !important;
+    }
+
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -6px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -22px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -22px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -6px !important; }
+
+    .team-select-mobile-nav {
+        position: absolute;
+        right: 6px;
+        top: 10px;
+        bottom: 10px;
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+    }
+
+    .team-select-mobile-nav.show {
+        display: flex;
+    }
+
+    .team-select-nav-button {
+        pointer-events: auto;
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 112px !important;
+        min-width: 112px !important;
+        padding: 4px 0 5px !important;
+    }
+
+    .team-card-logo {
+        width: 34px !important;
+        height: 34px !important;
+    }
+
+    .team-card-label {
+        max-width: 104px !important;
+        font-size: 10px !important;
+        line-height: 1.03 !important;
+    }
+
+    .team-card-role,
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 6px !important;
+        line-height: 1 !important;
+    }
+
+    .team-select-title {
+        font-size: 19px !important;
+    }
+
+    .team-select-subtitle {
+        font-size: 7px !important;
+    }
+
+    .team-select-footer {
+        font-size: 5px !important;
+    }
+}

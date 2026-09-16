@@ -95,6 +95,8 @@ let teamAssignments = {
 
 // Etapa 1: escolhe o lado vermelho. Etapa 0: escolhe o lado azul.
 let teamSelectionPlayer = 1;
+let teamMenuMobileScrollIndex = 0;
+const TEAM_MENU_MOBILE_VISIBLE_COUNT = 4;
 
 const MAX_CARDS = 3;
 const MAX_TEAM_PIECES = 10;
@@ -4069,6 +4071,7 @@ function showTeamSelectOverlay() {
     if(!overlay) return;
 
     teamSelectionPlayer = 1;
+    teamMenuMobileScrollIndex = 0;
     populateTeamSelectGrid();
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden","false");
@@ -4102,6 +4105,46 @@ function buildTeamSelectCard(teamKey, labelRole, disabled = false) {
     `;
 }
 
+function isPortraitMobileTeamMenu() {
+    return window.matchMedia("(orientation: portrait) and (max-width: 700px)").matches;
+}
+
+function isLandscapeMobileTeamMenu() {
+    return window.matchMedia("(orientation: landscape) and (max-height: 700px)").matches;
+}
+
+function updateTeamSelectMobileNav(totalItems, enabled) {
+    const nav = document.getElementById("teamSelectMobileNav");
+    const btnUp = document.getElementById("teamSelectNavUp");
+    const btnDown = document.getElementById("teamSelectNavDown");
+    if(!nav || !btnUp || !btnDown) return;
+
+    if(!enabled) {
+        nav.classList.remove("show");
+        nav.setAttribute("aria-hidden", "true");
+        btnUp.disabled = true;
+        btnDown.disabled = true;
+        return;
+    }
+
+    const maxIndex = Math.max(0, totalItems - TEAM_MENU_MOBILE_VISIBLE_COUNT);
+    if(teamMenuMobileScrollIndex > maxIndex) teamMenuMobileScrollIndex = maxIndex;
+
+    nav.classList.add("show");
+    nav.setAttribute("aria-hidden", "false");
+    btnUp.disabled = teamMenuMobileScrollIndex <= 0;
+    btnDown.disabled = teamMenuMobileScrollIndex >= maxIndex;
+}
+
+function scrollTeamMenu(direction) {
+    if(!isLandscapeMobileTeamMenu()) return;
+
+    const totalItems = 12;
+    const maxIndex = Math.max(0, totalItems - TEAM_MENU_MOBILE_VISIBLE_COUNT);
+    teamMenuMobileScrollIndex = Math.max(0, Math.min(maxIndex, teamMenuMobileScrollIndex + direction));
+    populateTeamSelectGrid();
+}
+
 function populateTeamSelectGrid() {
     const grid = document.getElementById("teamSelectGrid");
     const leftGrid = document.getElementById("teamSelectGridLeft");
@@ -4116,6 +4159,34 @@ function populateTeamSelectGrid() {
 
     const LEFT_SIDE_TEAM_KEYS = ["real-madrid", "arsenal", "borussia-dortmund", "vasco"];
     const RIGHT_SIDE_TEAM_KEYS = ["barcelona", "chelsea", "bayern-munique", "flamengo"];
+    const portraitOrderedItems = [
+        "arsenal",
+        "barcelona",
+        "bayern-munique",
+        "borussia-dortmund",
+        "chelsea",
+        "flamengo",
+        "real-madrid",
+        "vasco",
+        "__locked__",
+        "__locked__",
+        "__locked__",
+        "__locked__"
+    ];
+    const landscapeMobileItems = [
+        "real-madrid",
+        "arsenal",
+        "borussia-dortmund",
+        "vasco",
+        "barcelona",
+        "chelsea",
+        "bayern-munique",
+        "flamengo",
+        "__locked__",
+        "__locked__",
+        "__locked__",
+        "__locked__"
+    ];
 
     const renderItem = (teamKey) => {
         if(teamKey === "__locked__") {
@@ -4131,34 +4202,34 @@ function populateTeamSelectGrid() {
     while(leftItems.length < 6) leftItems.push("__locked__");
     while(rightItems.length < 6) rightItems.push("__locked__");
 
-    const isPortraitMobileTeamMenu = window.matchMedia("(orientation: portrait) and (max-width: 700px)").matches;
-    const portraitOrderedItems = [
-        "arsenal",
-        "barcelona",
-        "bayern-munique",
-        "borussia-dortmund",
-        "chelsea",
-        "flamengo",
-        "real-madrid",
-        "vasco",
-        "__locked__",
-        "__locked__",
-        "__locked__",
-        "__locked__"
-    ];
+    const portraitMobile = isPortraitMobileTeamMenu();
+    const landscapeMobile = isLandscapeMobileTeamMenu();
 
     if(leftGrid && rightGrid) {
-        if(isPortraitMobileTeamMenu) {
+        if(portraitMobile) {
             leftGrid.innerHTML = "";
             rightGrid.innerHTML = portraitOrderedItems.map(renderItem).join("");
+        } else if(landscapeMobile) {
+            leftGrid.innerHTML = "";
+            const visibleItems = landscapeMobileItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
+            rightGrid.innerHTML = visibleItems.map(renderItem).join("");
         } else {
             leftGrid.innerHTML = leftItems.map(renderItem).join("");
             rightGrid.innerHTML = rightItems.map(renderItem).join("");
         }
         if(grid) grid.innerHTML = "";
     } else if(grid) {
-        grid.innerHTML = (isPortraitMobileTeamMenu ? portraitOrderedItems : [...leftItems, ...rightItems]).map(renderItem).join("");
+        if(portraitMobile) {
+            grid.innerHTML = portraitOrderedItems.map(renderItem).join("");
+        } else if(landscapeMobile) {
+            const visibleItems = landscapeMobileItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
+            grid.innerHTML = visibleItems.map(renderItem).join("");
+        } else {
+            grid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");
+        }
     }
+
+    updateTeamSelectMobileNav(landscapeMobileItems.length, landscapeMobile);
 
     document.querySelectorAll("#teamSelectOverlay .team-card").forEach(card => {
         if(card.dataset.team === teamAssignments[teamSelectionPlayer]) {
@@ -13692,6 +13763,12 @@ createBoard();
 
 // Reorganiza o campo imediatamente ao girar/redimensionar o celular.
 window.addEventListener("resize", scheduleBoardVisualOrientation, { passive: true });
+window.addEventListener("resize", () => {
+    const overlay = document.getElementById("teamSelectOverlay");
+    if(overlay && overlay.classList.contains("show")) {
+        populateTeamSelectGrid();
+    }
+}, { passive: true });
 window.addEventListener("orientationchange", scheduleBoardVisualOrientation, { passive: true });
 
 createGoalHandlers();

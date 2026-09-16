@@ -4755,6 +4755,29 @@ button.bench-carousel-item:hover {
     cursor: pointer;
 }
 
+.victory-hub-button {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin: 8px auto 0;
+    padding: 11px 18px !important;
+    border: 1px solid rgba(56,189,248,.48) !important;
+    border-radius: 11px !important;
+    background: linear-gradient(145deg, #075985, #0c4a6e) !important;
+    color: #e0f2fe !important;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 1000;
+    letter-spacing: .25px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(2,132,199,.16);
+}
+
+.victory-hub-button:hover {
+    filter: brightness(1.14);
+    transform: translateY(-1px);
+}
+
 .ranking-overlay {
     position: fixed;
     inset: 0;

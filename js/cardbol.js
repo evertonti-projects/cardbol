@@ -12081,6 +12081,50 @@ async function resumeOnlineAfterGoalNow(retryCount = 0) {
     }
 }
 
+function returnToCardBolHub() {
+
+    // Guarda o modo antes da limpeza para encerrar corretamente o estado online.
+    const wasOnline = isOnlineMode();
+
+    // Reaproveita a rotina oficial de reinício para zerar placar, cartas, peças,
+    // relógios, efeitos, áudio de campeão e demais estados da partida encerrada.
+    newGame();
+    clearSharedAutoTimers();
+
+    if(wasOnline) {
+        clearOnlineLobbyTimers();
+        resetOnlineGameplaySyncState();
+        resetOnlineLobbyState();
+    }
+
+    gameMode = null;
+    formationSetupActive = false;
+    goalPause = false;
+
+    // Garante que nenhuma tela do fluxo da partida permaneça por cima da central.
+    [
+        "victoryOverlay",
+        "gameModeOverlay",
+        "teamSelectOverlay",
+        "onlineLobbyOverlay",
+        "periodOverlay",
+        "kickoffOverlay",
+        "rulesOverlay"
+    ].forEach(id => {
+        const element = document.getElementById(id);
+        if(!element) return;
+        element.classList.remove("show", "finishing");
+        element.setAttribute("aria-hidden", "true");
+    });
+
+    const hubButton = document.getElementById("victoryHubButton");
+    if(hubButton) hubButton.style.display = "none";
+
+    // O login permanece válido: voltamos diretamente para a Central Blue Tech.
+    showCardBolHub();
+}
+
+
 function handleOverlayButton() {
 
     if(winner !== null) {
@@ -12443,9 +12487,16 @@ function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
     const text = document.getElementById("victoryText");
     const button = document.getElementById("victoryButton");
     const rankingButton = document.getElementById("victoryRankingButton");
+    const hubButton = document.getElementById("victoryHubButton");
 
     if(rankingButton) {
         rankingButton.style.display = matchEnded ? "inline-flex" : "none";
+    }
+
+    // O retorno à Central de Jogos só aparece quando a partida realmente terminou.
+    // A mesma tela final é compartilhada pelos três modos: PVP local, CPU e 1×1 online.
+    if(hubButton) {
+        hubButton.style.display = matchEnded ? "inline-flex" : "none";
     }
 
     const isBlue = scoringPlayer === 0;

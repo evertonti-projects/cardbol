@@ -4114,24 +4114,29 @@ function populateTeamSelectGrid() {
         ? (isCpuMode() ? "SEU TIME" : "TIME VERMELHO")
         : (isCpuMode() ? "TIME DA CPU" : "TIME AZUL");
 
-    const cardsHtml = [];
+    const LEFT_SIDE_TEAM_KEYS = ["real-madrid", "arsenal", "borussia-dortmund", "vasco"];
+    const RIGHT_SIDE_TEAM_KEYS = ["barcelona", "chelsea", "bayern-munique", "flamengo"];
 
-    AVAILABLE_TEAM_KEYS.forEach(teamKey => {
+    const renderItem = (teamKey) => {
+        if(teamKey === "__locked__") {
+            return `<div class="team-card-locked">EM BREVE</div>`;
+        }
         const disabled = !choosingRed && teamKey === teamAssignments[1];
-        cardsHtml.push(buildTeamSelectCard(teamKey, roleText, disabled));
-    });
+        return buildTeamSelectCard(teamKey, roleText, disabled);
+    };
 
-    const lockedSlots = Math.max(0, 12 - AVAILABLE_TEAM_KEYS.length);
-    for(let i = 0; i < lockedSlots; i++) {
-        cardsHtml.push(`<div class="team-card-locked">EM BREVE</div>`);
-    }
+    const leftItems = [...LEFT_SIDE_TEAM_KEYS];
+    const rightItems = [...RIGHT_SIDE_TEAM_KEYS];
+
+    while(leftItems.length < 6) leftItems.push("__locked__");
+    while(rightItems.length < 6) rightItems.push("__locked__");
 
     if(leftGrid && rightGrid) {
-        leftGrid.innerHTML = cardsHtml.slice(0, 6).join("");
-        rightGrid.innerHTML = cardsHtml.slice(6, 12).join("");
+        leftGrid.innerHTML = leftItems.map(renderItem).join("");
+        rightGrid.innerHTML = rightItems.map(renderItem).join("");
         if(grid) grid.innerHTML = "";
     } else if(grid) {
-        grid.innerHTML = cardsHtml.join("");
+        grid.innerHTML = [...leftItems, ...rightItems].map(renderItem).join("");
     }
 
     document.querySelectorAll("#teamSelectOverlay .team-card").forEach(card => {

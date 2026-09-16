@@ -8049,3 +8049,65 @@ body.cardbol-level-3 .ranking-level-info strong {
     .team-select-grid-right > *:nth-child(4) { --curve-shift: -7px !important; }
     .team-select-grid-right > *:nth-child(5) { --curve-shift: -4px !important; }
 }
+
+
+/* =========================================================
+   MENU DE TIMES — ARCO PARA DENTRO
+========================================================= */
+.team-select-grid-left > *:nth-child(1) { --curve-shift: 6px !important; }
+.team-select-grid-left > *:nth-child(2) { --curve-shift: 18px !important; }
+.team-select-grid-left > *:nth-child(3) { --curve-shift: 32px !important; }
+.team-select-grid-left > *:nth-child(4) { --curve-shift: 32px !important; }
+.team-select-grid-left > *:nth-child(5) { --curve-shift: 18px !important; }
+.team-select-grid-left > *:nth-child(6) { --curve-shift: 6px !important; }
+.team-select-grid-right > *:nth-child(1) { --curve-shift: -6px !important; }
+.team-select-grid-right > *:nth-child(2) { --curve-shift: -18px !important; }
+.team-select-grid-right > *:nth-child(3) { --curve-shift: -32px !important; }
+.team-select-grid-right > *:nth-child(4) { --curve-shift: -32px !important; }
+.team-select-grid-right > *:nth-child(5) { --curve-shift: -18px !important; }
+.team-select-grid-right > *:nth-child(6) { --curve-shift: -6px !important; }
+
+@media (max-width: 1100px) {
+    .team-select-grid-left > *:nth-child(1) { --curve-shift: 4px !important; }
+    .team-select-grid-left > *:nth-child(2) { --curve-shift: 12px !important; }
+    .team-select-grid-left > *:nth-child(3) { --curve-shift: 22px !important; }
+    .team-select-grid-left > *:nth-child(4) { --curve-shift: 22px !important; }
+    .team-select-grid-left > *:nth-child(5) { --curve-shift: 12px !important; }
+    .team-select-grid-left > *:nth-child(6) { --curve-shift: 4px !important; }
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -4px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -12px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -22px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -22px !important; }
+    .team-select-grid-right > *:nth-child(5) { --curve-shift: -12px !important; }
+    .team-select-grid-right > *:nth-child(6) { --curve-shift: -4px !important; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+    .team-select-grid-left > *:nth-child(1) { --curve-shift: 2px !important; }
+    .team-select-grid-left > *:nth-child(2) { --curve-shift: 5px !important; }
+    .team-select-grid-left > *:nth-child(3) { --curve-shift: 9px !important; }
+    .team-select-grid-left > *:nth-child(4) { --curve-shift: 9px !important; }
+    .team-select-grid-left > *:nth-child(5) { --curve-shift: 5px !important; }
+    .team-select-grid-left > *:nth-child(6) { --curve-shift: 2px !important; }
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -2px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -5px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -9px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -9px !important; }
+    .team-select-grid-right > *:nth-child(5) { --curve-shift: -5px !important; }
+    .team-select-grid-right > *:nth-child(6) { --curve-shift: -2px !important; }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .team-select-grid-left > *:nth-child(1) { --curve-shift: 2px !important; }
+    .team-select-grid-left > *:nth-child(2) { --curve-shift: 4px !important; }
+    .team-select-grid-left > *:nth-child(3) { --curve-shift: 7px !important; }
+    .team-select-grid-left > *:nth-child(4) { --curve-shift: 7px !important; }
+    .team-select-grid-left > *:nth-child(5) { --curve-shift: 4px !important; }
+    .team-select-grid-left > *:nth-child(6) { --curve-shift: 2px !important; }
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -2px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -4px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -7px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -7px !important; }
+    .team-select-grid-right > *:nth-child(5) { --curve-shift: -4px !important; }
+    .team-select-grid-right > *:nth-child(6) { --curve-shift: -2px !important; }
+}

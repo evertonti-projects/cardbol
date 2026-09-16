@@ -378,21 +378,33 @@ const card10VideoPaths = [
     "videos/carta-10-video-a.mp4",
     "videos/carta-10-video-b.mp4"
 ];
+// ============================================================
+// MIXAGEM GERAL DE ÁUDIO
+// Comentários/narração em destaque; efeitos do jogo reduzidos.
+// ============================================================
+const EFFECT_AUDIO_VOLUME = 0.25;
+const COMMENTARY_AUDIO_VOLUME = 1.00;
+const MENU_MUSIC_VOLUME = 0.25;
+
 const card1ExpulsionAudio = new Audio("audios/audio-carta1-apito-expulso.mp3");
 card1ExpulsionAudio.preload = "auto";
+card1ExpulsionAudio.volume = EFFECT_AUDIO_VOLUME;
 const card2SubstitutionAudio = new Audio("audios/audio-carta2-subs+1peca.mp3");
 card2SubstitutionAudio.preload = "auto";
+card2SubstitutionAudio.volume = EFFECT_AUDIO_VOLUME;
 
 const card8BlockAudio = new Audio("audios/audio-carta8.mp3");
 card8BlockAudio.preload = "auto";
+card8BlockAudio.volume = EFFECT_AUDIO_VOLUME;
 
 const card10CatimbaAudio = new Audio("audios/audio-carta10.mp3");
 card10CatimbaAudio.preload = "auto";
+card10CatimbaAudio.volume = EFFECT_AUDIO_VOLUME;
 
 // Carta 7 — efeito de fogo da JOGADA ENSAIADA.
 const card7FireAudio = new Audio("audios/audio-efeito-carta7-fogo.mp3");
 card7FireAudio.preload = "auto";
-card7FireAudio.volume = 0.9;
+card7FireAudio.volume = EFFECT_AUDIO_VOLUME;
 
 // Trilha ambiente do menu / formação / intervalo.
 // A faixa inicial e as seguintes são sorteadas sem repetição imediata.
@@ -405,7 +417,7 @@ const menuMusicPaths = [
 
 const menuMusicAudio = new Audio();
 menuMusicAudio.preload = "auto";
-menuMusicAudio.volume = 0.24;
+menuMusicAudio.volume = MENU_MUSIC_VOLUME;
 
 let menuMusicLastIndex = -1;
 let menuMusicFadeTimer = null;
@@ -414,6 +426,7 @@ let menuMusicPrimed = false;
 
 const kickoffRouletteAudio = new Audio("audios/audio-roleta-gira.mp3");
 kickoffRouletteAudio.preload = "auto";
+kickoffRouletteAudio.volume = EFFECT_AUDIO_VOLUME;
 kickoffRouletteAudio.loop = true;
 
 const goalCelebrationAudios = [
@@ -422,10 +435,12 @@ const goalCelebrationAudios = [
 ];
 goalCelebrationAudios.forEach(audio => {
     audio.preload = "auto";
+    audio.volume = EFFECT_AUDIO_VOLUME;
 });
 
 const finalVictoryAudio = new Audio("audios/audio-goal-5final.mp3");
 finalVictoryAudio.preload = "auto";
+finalVictoryAudio.volume = EFFECT_AUDIO_VOLUME;
 
 // ============================================================
 // COMENTARISTA DO CARDBOL
@@ -466,7 +481,7 @@ const commentaryAudioPools = Object.fromEntries(
         paths.map(path => {
             const audio = new Audio(path);
             audio.preload = "auto";
-            audio.volume = 1;
+            audio.volume = COMMENTARY_AUDIO_VOLUME;
             return audio;
         })
     ])
@@ -536,7 +551,7 @@ function playCommentary(groupName, { chance = 1, delay = 0 } = {}) {
         try {
             audio.pause();
             audio.currentTime = 0;
-            audio.volume = 1;
+            audio.volume = COMMENTARY_AUDIO_VOLUME;
             const promise = audio.play();
             if(promise && typeof promise.catch === "function") {
                 promise.catch(() => {});
@@ -611,7 +626,7 @@ function playSelectedMenuTrack(index, resetTime = true) {
         try { menuMusicAudio.currentTime = 0; } catch(error) {}
     }
 
-    menuMusicAudio.volume = 0.24;
+    menuMusicAudio.volume = MENU_MUSIC_VOLUME;
 
     const promise = menuMusicAudio.play();
     if(promise && typeof promise.catch === "function") {
@@ -634,7 +649,7 @@ function startMenuMusic({ forceNewTrack = false } = {}) {
         !menuMusicAudio.paused &&
         menuMusicAudio.src
     ) {
-        menuMusicAudio.volume = 0.24;
+        menuMusicAudio.volume = MENU_MUSIC_VOLUME;
         return;
     }
 
@@ -646,7 +661,7 @@ function startMenuMusic({ forceNewTrack = false } = {}) {
         menuMusicAudio.currentTime > 0 &&
         !menuMusicAudio.ended
     ) {
-        menuMusicAudio.volume = 0.24;
+        menuMusicAudio.volume = MENU_MUSIC_VOLUME;
         const promise = menuMusicAudio.play();
         if(promise && typeof promise.catch === "function") {
             promise.catch(() => {});
@@ -666,7 +681,7 @@ function fadeOutMenuMusic(duration = 900) {
     }
 
     if(menuMusicAudio.paused) {
-        menuMusicAudio.volume = 0.24;
+        menuMusicAudio.volume = MENU_MUSIC_VOLUME;
         return;
     }
 
@@ -683,7 +698,7 @@ function fadeOutMenuMusic(duration = 900) {
 
             menuMusicAudio.pause();
             menuMusicAudio.currentTime = 0;
-            menuMusicAudio.volume = 0.24;
+            menuMusicAudio.volume = MENU_MUSIC_VOLUME;
         }
     }, 30);
 }
@@ -708,15 +723,15 @@ function primeMenuMusic() {
                     setTimeout(() => {
                         menuMusicAudio.pause();
                         menuMusicAudio.currentTime = 0;
-                        menuMusicAudio.volume = 0.24;
+                        menuMusicAudio.volume = MENU_MUSIC_VOLUME;
                     }, 40);
                 })
                 .catch(() => {
-                    menuMusicAudio.volume = 0.24;
+                    menuMusicAudio.volume = MENU_MUSIC_VOLUME;
                 });
         }
     } catch(error) {
-        menuMusicAudio.volume = 0.24;
+        menuMusicAudio.volume = MENU_MUSIC_VOLUME;
     }
 }
 
@@ -729,7 +744,7 @@ function playCard7FireAudio() {
     try {
         card7FireAudio.pause();
         card7FireAudio.currentTime = 0;
-        card7FireAudio.volume = 0.9;
+        card7FireAudio.volume = EFFECT_AUDIO_VOLUME;
 
         const promise = card7FireAudio.play();
         if(promise && typeof promise.catch === "function") {
@@ -8156,11 +8171,13 @@ function keepCard7FireForThreeSeconds(pieceIds, owner) {
 
 const pieceSlideAudio = new Audio("audios/audio-desliza-peca.mp3");
 pieceSlideAudio.preload = "auto";
+pieceSlideAudio.volume = EFFECT_AUDIO_VOLUME;
 
 function playPieceSlideAudio() {
     try {
         pieceSlideAudio.pause();
         pieceSlideAudio.currentTime = 0;
+        pieceSlideAudio.volume = EFFECT_AUDIO_VOLUME;
         const playPromise = pieceSlideAudio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -9848,6 +9865,7 @@ function showCard1ExpulsionVideo(onFinish = null) {
     try {
         card1ExpulsionAudio.pause();
         card1ExpulsionAudio.currentTime = 0;
+        card1ExpulsionAudio.volume = EFFECT_AUDIO_VOLUME;
         const audioPromise = card1ExpulsionAudio.play();
         if(audioPromise && typeof audioPromise.catch === "function") {
             audioPromise.catch(() => {});
@@ -9920,6 +9938,7 @@ function showCard2BloodNewVideo(onFinish = null) {
     try {
         card2SubstitutionAudio.pause();
         card2SubstitutionAudio.currentTime = 0;
+        card2SubstitutionAudio.volume = EFFECT_AUDIO_VOLUME;
         const audioPromise = card2SubstitutionAudio.play();
         if(audioPromise && typeof audioPromise.catch === "function") {
             audioPromise.catch(() => {});
@@ -10163,6 +10182,7 @@ function showCard8BlockVideo(onFinish = null) {
     try {
         card8BlockAudio.pause();
         card8BlockAudio.currentTime = 0;
+        card8BlockAudio.volume = EFFECT_AUDIO_VOLUME;
         const audioPromise = card8BlockAudio.play();
         if(audioPromise && typeof audioPromise.catch === "function") {
             audioPromise.catch(() => {});
@@ -10288,6 +10308,7 @@ function showCard10CatimbaVideo(onFinish = null) {
     try {
         card10CatimbaAudio.pause();
         card10CatimbaAudio.currentTime = 0;
+        card10CatimbaAudio.volume = EFFECT_AUDIO_VOLUME;
         const audioPromise = card10CatimbaAudio.play();
         if(audioPromise && typeof audioPromise.catch === "function") {
             audioPromise.catch(() => {});
@@ -11172,6 +11193,7 @@ let nextDiceRollAudioIndex = 0;
 
 diceRollAudios.forEach(audio => {
     audio.preload = "auto";
+    audio.volume = EFFECT_AUDIO_VOLUME;
 });
 
 function playNextDiceRollAudio() {
@@ -11183,6 +11205,7 @@ function playNextDiceRollAudio() {
     try {
         audio.pause();
         audio.currentTime = 0;
+        audio.volume = EFFECT_AUDIO_VOLUME;
         const playPromise = audio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -12682,6 +12705,7 @@ function playNextGoalCelebrationAudio() {
 
         audio.pause();
         audio.currentTime = 0;
+        audio.volume = EFFECT_AUDIO_VOLUME;
         const playPromise = audio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -12700,6 +12724,7 @@ function playFinalVictoryAudio() {
 
         finalVictoryAudio.pause();
         finalVictoryAudio.currentTime = 0;
+        finalVictoryAudio.volume = EFFECT_AUDIO_VOLUME;
         const playPromise = finalVictoryAudio.play();
         if(playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -13223,7 +13248,7 @@ function playKickoffRouletteAudio() {
     try {
         kickoffRouletteAudio.pause();
         kickoffRouletteAudio.currentTime = 0;
-        kickoffRouletteAudio.volume = 1;
+        kickoffRouletteAudio.volume = EFFECT_AUDIO_VOLUME;
         kickoffRouletteAudio.loop = true;
 
         const playPromise = kickoffRouletteAudio.play();
@@ -13465,7 +13490,7 @@ function startOpeningPresentation() {
     video.currentTime = 0;
 
     audio.loop = true;
-    audio.volume = 1;
+    audio.volume = EFFECT_AUDIO_VOLUME;
     audio.currentTime = 0;
 
     // Este método é chamado diretamente por um clique do usuário.
@@ -13499,7 +13524,7 @@ function fadeOutOpeningAudio(duration = 1000, onFinish = null) {
         if(audio) {
             audio.pause();
             audio.currentTime = 0;
-            audio.volume = 1;
+            audio.volume = EFFECT_AUDIO_VOLUME;
         }
         if(typeof onFinish === "function") onFinish();
         return;
@@ -13517,7 +13542,7 @@ function fadeOutOpeningAudio(duration = 1000, onFinish = null) {
             openingAudioFadeTimer = null;
             audio.pause();
             audio.currentTime = 0;
-            audio.volume = 1;
+            audio.volume = EFFECT_AUDIO_VOLUME;
 
             if(typeof onFinish === "function") onFinish();
         }
@@ -13538,7 +13563,7 @@ function initOpeningScreen() {
     audio.loop = true;
     audio.pause();
     audio.currentTime = 0;
-    audio.volume = 1;
+    audio.volume = EFFECT_AUDIO_VOLUME;
 
     openingPresentationStarted = false;
     openingPresentationFinished = false;

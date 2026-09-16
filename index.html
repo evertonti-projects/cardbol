@@ -437,13 +437,17 @@
 </div>
 
 <div id="teamSelectOverlay" class="team-select-overlay" aria-hidden="true">
-    <div class="team-select-panel">
+    <div class="team-select-panel team-select-panel-stadium">
         <h2 class="team-select-title">SELECIONAR TIME</h2>
         <p id="teamSelectSubtitle" class="team-select-subtitle">
             Escolha os dois clubes da partida, um lado de cada vez.
         </p>
 
-        <div id="teamSelectGrid" class="team-select-grid"></div>
+        <div class="team-select-layout">
+            <div id="teamSelectGridLeft" class="team-select-grid team-select-grid-side team-select-grid-left"></div>
+            <div class="team-select-center" aria-hidden="true"></div>
+            <div id="teamSelectGridRight" class="team-select-grid team-select-grid-side team-select-grid-right"></div>
+        </div>
 
         <div class="team-select-footer">
             Disponíveis agora: Barcelona, Real Madrid, Arsenal, Chelsea, Bayern de Munique, Borussia Dortmund, Vasco e Flamengo. Os demais espaços ficam reservados para futuras equipes.

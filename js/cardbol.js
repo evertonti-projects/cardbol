@@ -4104,29 +4104,37 @@ function buildTeamSelectCard(teamKey, labelRole, disabled = false) {
 
 function populateTeamSelectGrid() {
     const grid = document.getElementById("teamSelectGrid");
+    const leftGrid = document.getElementById("teamSelectGridLeft");
+    const rightGrid = document.getElementById("teamSelectGridRight");
     const subtitle = document.getElementById("teamSelectSubtitle");
-    if(!grid) return;
+    if(!grid && (!leftGrid || !rightGrid)) return;
 
     const choosingRed = teamSelectionPlayer === 1;
     const roleText = choosingRed
         ? (isCpuMode() ? "SEU TIME" : "TIME VERMELHO")
         : (isCpuMode() ? "TIME DA CPU" : "TIME AZUL");
 
-    let html = "";
+    const cardsHtml = [];
 
     AVAILABLE_TEAM_KEYS.forEach(teamKey => {
         const disabled = !choosingRed && teamKey === teamAssignments[1];
-        html += buildTeamSelectCard(teamKey, roleText, disabled);
+        cardsHtml.push(buildTeamSelectCard(teamKey, roleText, disabled));
     });
 
     const lockedSlots = Math.max(0, 12 - AVAILABLE_TEAM_KEYS.length);
     for(let i = 0; i < lockedSlots; i++) {
-        html += `<div class="team-card-locked">EM BREVE</div>`;
+        cardsHtml.push(`<div class="team-card-locked">EM BREVE</div>`);
     }
 
-    grid.innerHTML = html;
+    if(leftGrid && rightGrid) {
+        leftGrid.innerHTML = cardsHtml.slice(0, 6).join("");
+        rightGrid.innerHTML = cardsHtml.slice(6, 12).join("");
+        if(grid) grid.innerHTML = "";
+    } else if(grid) {
+        grid.innerHTML = cardsHtml.join("");
+    }
 
-    grid.querySelectorAll(".team-card").forEach(card => {
+    document.querySelectorAll("#teamSelectOverlay .team-card").forEach(card => {
         if(card.dataset.team === teamAssignments[teamSelectionPlayer]) {
             card.classList.add("active-team-card");
         }

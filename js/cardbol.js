@@ -427,6 +427,158 @@ goalCelebrationAudios.forEach(audio => {
 const finalVictoryAudio = new Audio("audios/audio-goal-5final.mp3");
 finalVictoryAudio.preload = "auto";
 
+// ============================================================
+// COMENTARISTA DO CARDBOL
+// Arquivos esperados em: audios/comentarios/
+// - Início da partida: sempre toca 1 das 5 variações.
+// - Gol no modo CPU (1º ao 4º): 80% de chance.
+//   O áudio do comentarista usa um canal separado e pode tocar junto
+//   com os efeitos normais de gol do jogo.
+// ============================================================
+
+const commentaryAudioGroups = {
+    initGame: [
+        "audios/comentarios/init-game-cb1.mp3",
+        "audios/comentarios/init-game-cb2.mp3",
+        "audios/comentarios/init-game-cb3.mp3",
+        "audios/comentarios/init-game-cb4.mp3",
+        "audios/comentarios/init-game-cb5.mp3"
+    ],
+    playerGoal: [
+        "audios/comentarios/goal-player-1.mp3",
+        "audios/comentarios/goal-player-2.mp3",
+        "audios/comentarios/goal-player-3.mp3",
+        "audios/comentarios/goal-player-4.mp3",
+        "audios/comentarios/goal-player-5.mp3"
+    ],
+    cpuGoal: [
+        "audios/comentarios/goal-cpu-1.mp3",
+        "audios/comentarios/goal-cpu-2.mp3",
+        "audios/comentarios/goal-cpu-3.mp3",
+        "audios/comentarios/goal-cpu-4.mp3",
+        "audios/comentarios/goal-cpu-5.mp3"
+    ]
+};
+
+const commentaryAudioPools = Object.fromEntries(
+    Object.entries(commentaryAudioGroups).map(([groupName, paths]) => [
+        groupName,
+        paths.map(path => {
+            const audio = new Audio(path);
+            audio.preload = "auto";
+            audio.volume = 1;
+            return audio;
+        })
+    ])
+);
+
+const commentaryLastIndexes = {
+    initGame: -1,
+    playerGoal: -1,
+    cpuGoal: -1
+};
+
+let commentaryTimer = null;
+let initGameCommentaryPlayed = false;
+
+function stopCommentaryAudio() {
+    if(commentaryTimer) {
+        clearTimeout(commentaryTimer);
+        commentaryTimer = null;
+    }
+
+    Object.values(commentaryAudioPools).flat().forEach(audio => {
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+        } catch(error) {}
+    });
+}
+
+function chooseCommentaryAudio(groupName) {
+    const pool = commentaryAudioPools[groupName] || [];
+    if(!pool.length) return null;
+
+    let index = 0;
+
+    if(pool.length > 1) {
+        const candidates = pool
+            .map((_, candidateIndex) => candidateIndex)
+            .filter(candidateIndex => candidateIndex !== commentaryLastIndexes[groupName]);
+
+        index = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    commentaryLastIndexes[groupName] = index;
+    return pool[index];
+}
+
+function playCommentary(groupName, { chance = 1, delay = 0 } = {}) {
+    if(Math.random() > chance) return false;
+
+    const audio = chooseCommentaryAudio(groupName);
+    if(!audio) return false;
+
+    const playNow = () => {
+        commentaryTimer = null;
+
+        // Evita duas falas do comentarista atropelando uma à outra,
+        // mas não interrompe efeitos, música, dado ou áudio de gol.
+        Object.values(commentaryAudioPools).flat().forEach(item => {
+            if(item !== audio) {
+                try {
+                    item.pause();
+                    item.currentTime = 0;
+                } catch(error) {}
+            }
+        });
+
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = 1;
+            const promise = audio.play();
+            if(promise && typeof promise.catch === "function") {
+                promise.catch(() => {});
+            }
+        } catch(error) {
+            // Comentário nunca deve bloquear a partida.
+        }
+    };
+
+    if(commentaryTimer) {
+        clearTimeout(commentaryTimer);
+        commentaryTimer = null;
+    }
+
+    if(delay > 0) {
+        commentaryTimer = setTimeout(playNow, delay);
+    } else {
+        playNow();
+    }
+
+    return true;
+}
+
+function playInitGameCommentaryOnce() {
+    if(initGameCommentaryPlayed || winner !== null) return;
+
+    initGameCommentaryPlayed = true;
+    playCommentary("initGame", { chance: 1, delay: 180 });
+}
+
+function playGoalCommentary(scoringPlayer) {
+    // As falas player/CPU desta primeira leva pertencem ao modo Contra CPU.
+    // Em PVP local e online continuamos apenas com os efeitos normais por enquanto.
+    if(!isCpuMode() || winner !== null) return;
+
+    if(scoringPlayer === HUMAN_PLAYER) {
+        playCommentary("playerGoal", { chance: 0.8, delay: 420 });
+    } else if(scoringPlayer === CPU_PLAYER) {
+        playCommentary("cpuGoal", { chance: 0.8, delay: 420 });
+    }
+}
+
 let nextGoalCelebrationAudioIndex = 0;
 
 let nextCard1VideoIndex = 0;
@@ -3496,6 +3648,10 @@ async function markOnlineRoomPlaying() {
         onlineServerActivePlayer = currentPlayer;
         matchClockRunning = true;
         lastClockTickAt = Date.now();
+
+        // No online o relógio é ativado diretamente aqui, sem startMatchClock().
+        // Por isso a fala de abertura também é disparada neste ponto.
+        playInitGameCommentaryOnce();
 
         startOnlineGamePolling();
 
@@ -11449,6 +11605,12 @@ function startMatchClock() {
     lastClockTickAt = Date.now();
     resetTurnClock();
 
+    // Primeira bola rolando da partida: comentário de abertura 10/10.
+    // A trava impede repetição no 2º tempo e nas prorrogações.
+    if(matchPeriod === 1 && initialKickoffPlayer !== null) {
+        playInitGameCommentaryOnce();
+    }
+
     if(!matchClockInterval) {
         matchClockInterval = setInterval(tickGameClocks, 200);
     }
@@ -12068,6 +12230,10 @@ function registerGoal(scoringPlayer, scoringPiece = null) {
     }
 
     showVictory(false, scoringPlayer);
+
+    // 1º ao 4º gol no modo Contra CPU: 8/10 de chance de comentário.
+    // O 5º gol fica reservado ao áudio especial de vitória já existente.
+    playGoalCommentary(scoringPlayer);
 
     if(isOnlineMode()) {
         // No online o estado pós-gol precisa ser gravado pelo jogador que
@@ -12828,6 +12994,11 @@ document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 function newGame() {
 
     clearSharedAutoTimers();
+
+    // Uma nova partida libera novamente a fala de abertura e encerra
+    // qualquer comentário pendente da partida anterior.
+    stopCommentaryAudio();
+    initGameCommentaryPlayed = false;
 
     // Reiniciar leva novamente à formação: sorteia uma trilha ambiente.
     startMenuMusic({ forceNewTrack: true });

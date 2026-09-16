@@ -1092,6 +1092,60 @@ function hidePlayerIdentityOverlay() {
     overlay.setAttribute("aria-hidden", "true");
 }
 
+// ============================================================
+// CENTRAL DE JOGOS — LOGIN PRIMEIRO
+// A página inicia na autenticação; após o login, o usuário
+// escolhe qual experiência CardBol deseja abrir.
+// ============================================================
+function showCardBolHub() {
+    const hub = document.getElementById("cardbolHubOverlay");
+    const user = document.getElementById("cardbolHubUser");
+    const opening = document.getElementById("openingScreen");
+
+    if(opening) opening.style.display = "none";
+    if(!hub) {
+        showRulesOverlay();
+        return;
+    }
+
+    if(user) {
+        user.textContent = currentUserIdentity.username
+            ? `👤 ${currentUserIdentity.username}`
+            : "👤 JOGADOR";
+    }
+
+    startMenuMusic();
+    hub.classList.add("show");
+    hub.setAttribute("aria-hidden", "false");
+}
+
+function hideCardBolHub() {
+    const hub = document.getElementById("cardbolHubOverlay");
+    if(!hub) return;
+
+    hub.classList.remove("show");
+    hub.setAttribute("aria-hidden", "true");
+}
+
+function launchCardBolFromHub() {
+    const screen = document.getElementById("openingScreen");
+    if(!screen) {
+        hideCardBolHub();
+        showRulesOverlay();
+        return;
+    }
+
+    hideCardBolHub();
+    fadeOutMenuMusic(450);
+
+    screen.classList.remove("closing");
+    screen.style.display = "flex";
+
+    // Reinicia a apresentação para que o usuário possa escolher
+    // TELA CHEIA ou MODO NORMAL antes do vídeo de abertura.
+    initOpeningScreen();
+}
+
 function normalizePinInput(input) {
     if(!input) return;
     input.value = input.value.replace(/\D/g, "").slice(0, 4);
@@ -1723,7 +1777,7 @@ async function submitPlayerIdentity(event) {
 
         window.setTimeout(() => {
             hidePlayerIdentityOverlay();
-            showRulesOverlay();
+            showCardBolHub();
         }, 450);
 
     } catch(connectionError) {
@@ -13229,11 +13283,11 @@ function enterCardBolGame() {
         screen.style.display = "none";
         applyTeamBranding();
 
-        // A trilha aleatória assume o áudio depois da apresentação
-        // e permanece por login, regras, menus e formação.
+        // O usuário já entrou antes de chegar à Central Blue Tech.
+        // Depois da abertura, seguimos diretamente para as regras.
         startMenuMusic({ forceNewTrack: true });
 
-        showPlayerIdentityOverlay();
+        showRulesOverlay();
     });
 }
 
@@ -13263,11 +13317,17 @@ applyTeamBranding();
 render();
 
 setMessage(
-    "⚽ Escolha o modo de jogo após a abertura.",
+    "🔐 Entre no CardBol para acessar a central de jogos.",
     0
 );
 
 initOpeningScreen();
+
+// LOGIN é a primeira tela obrigatória do site. A abertura do jogo
+// só aparece depois que o usuário autentica e escolhe CARDBOL no hub.
+const initialOpeningScreen = document.getElementById("openingScreen");
+if(initialOpeningScreen) initialOpeningScreen.style.display = "none";
+showPlayerIdentityOverlay();
 startBenchCarousels();
 
 

@@ -27,7 +27,7 @@
 
 <body>
 
-<div id="openingScreen" class="opening-screen" aria-label="Abertura do CardBol">
+<div id="openingScreen" class="opening-screen" aria-label="Abertura do CardBol" style="display:none;">
     <video
         id="openingVideo"
         class="opening-video"
@@ -128,6 +128,42 @@
             ⚽ ENTRAR NO CARDBOL
         </button>
     </form>
+</div>
+
+<!-- Central de jogos exibida somente após autenticação -->
+<div id="cardbolHubOverlay" class="cardbol-hub-overlay" aria-hidden="true">
+    <div class="cardbol-hub-tech-grid" aria-hidden="true"></div>
+    <div class="cardbol-hub-glow hub-glow-one" aria-hidden="true"></div>
+    <div class="cardbol-hub-glow hub-glow-two" aria-hidden="true"></div>
+
+    <main class="cardbol-hub-shell" aria-label="Central de jogos CardBol">
+        <header class="cardbol-hub-header">
+            <div class="cardbol-hub-brand">
+                <img src="imagens/geral/favicon-128x128.png" alt="CardBol" class="cardbol-hub-brand-icon">
+                <div>
+                    <div class="cardbol-hub-eyebrow">CARDBOL • GAME HUB</div>
+                    <h1>ESCOLHA SEU JOGO</h1>
+                </div>
+            </div>
+            <div id="cardbolHubUser" class="cardbol-hub-user">JOGADOR</div>
+        </header>
+
+        <section class="cardbol-hub-content">
+            <button class="cardbol-game-card" type="button" onclick="launchCardBolFromHub()" aria-label="Abrir CardBol - A Pelada Tática">
+                <span class="cardbol-game-card-scan" aria-hidden="true"></span>
+                <img src="imagens/geral/favicon-128x128.png" alt="" class="cardbol-game-icon">
+                <span class="cardbol-game-copy">
+                    <strong>CARDBOL</strong>
+                    <small>A PELADA TÁTICA</small>
+                </span>
+                <span class="cardbol-game-action">JOGAR <b>›</b></span>
+            </button>
+        </section>
+
+        <footer class="cardbol-hub-footer">
+            <span class="hub-status-dot"></span> SISTEMA ONLINE
+        </footer>
+    </main>
 </div>
 
 <div id="rulesOverlay" class="rules-overlay" aria-hidden="true">

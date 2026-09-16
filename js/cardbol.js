@@ -674,6 +674,22 @@ function startMenuMusic({ forceNewTrack = false } = {}) {
     playSelectedMenuTrack(chooseNextMenuMusicIndex(), true);
 }
 
+function stopMenuMusicImmediately() {
+    menuMusicEnabled = false;
+
+    if(menuMusicFadeTimer) {
+        clearInterval(menuMusicFadeTimer);
+        menuMusicFadeTimer = null;
+    }
+
+    try {
+        menuMusicAudio.pause();
+        menuMusicAudio.currentTime = 0;
+    } catch(error) {}
+
+    menuMusicAudio.volume = MENU_MUSIC_VOLUME;
+}
+
 function fadeOutMenuMusic(duration = 900) {
     menuMusicEnabled = false;
 
@@ -1224,7 +1240,9 @@ let currentUserIdentity = {
 let playerIdentitySubmitting = false;
 
 function showPlayerIdentityOverlay() {
-    startMenuMusic();
+    // A tela de login deve permanecer silenciosa. A trilha de menu só
+    // começa depois que o usuário autentica e entra na Central Blue Tech.
+    stopMenuMusicImmediately();
 
     const overlay = document.getElementById("playerIdentityOverlay");
     const usernameInput = document.getElementById("playerUsernameInput");

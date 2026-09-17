@@ -199,10 +199,12 @@ function keeperMoveForZone(zoneIndex) {
   const col = zoneIndex % 3;
   const high = zoneIndex < 3;
   const side = col === 0 ? -1 : col === 2 ? 1 : 0;
+  const lateralBoost = 1.30; // 30% mais para os lados
+  const verticalBoost = 1.30; // 30% mais para cima nas bolas altas
   return {
-    x: side * (high ? 6.0 : 4.2),
-    y: high ? -1.8 : 1.1,
-    shadowX: side * 4.6,
+    x: side * (high ? 6.0 * lateralBoost : 4.2 * lateralBoost),
+    y: high ? -1.8 * verticalBoost : 1.1,
+    shadowX: side * 4.6 * lateralBoost,
     shadowScale: high ? .58 : .72
   };
 }

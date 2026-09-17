@@ -71,6 +71,13 @@ const CLUBS = {
         shortName: "Flamengo",
         folder: "flamengo",
         cardClass: "flamengo-card"
+    },
+    corinthians: {
+        key: "corinthians",
+        name: "CORINTHIANS",
+        shortName: "Corinthians",
+        folder: "corinthians",
+        cardClass: "corinthians-card"
     }
 };
 
@@ -82,7 +89,8 @@ const AVAILABLE_TEAM_KEYS = [
     "bayern-munique",
     "borussia-dortmund",
     "vasco",
-    "flamengo"
+    "flamengo",
+    "corinthians"
 ];
 
 // O seletor agora possui duas etapas:
@@ -4196,17 +4204,17 @@ function populateTeamSelectGrid() {
         : (isCpuMode() ? "TIME DA CPU" : "TIME AZUL");
 
     const LEFT_SIDE_TEAM_KEYS = ["real-madrid", "arsenal", "borussia-dortmund", "vasco"];
-    const RIGHT_SIDE_TEAM_KEYS = ["barcelona", "chelsea", "bayern-munique", "flamengo"];
+    const RIGHT_SIDE_TEAM_KEYS = ["barcelona", "chelsea", "bayern-munique", "flamengo", "corinthians"];
     const portraitOrderedItems = [
         "arsenal",
         "barcelona",
         "bayern-munique",
         "borussia-dortmund",
         "chelsea",
+        "corinthians",
         "flamengo",
         "real-madrid",
         "vasco",
-        "__locked__",
         "__locked__",
         "__locked__",
         "__locked__"
@@ -4220,7 +4228,7 @@ function populateTeamSelectGrid() {
         "chelsea",
         "bayern-munique",
         "flamengo",
-        "__locked__",
+        "corinthians",
         "__locked__",
         "__locked__",
         "__locked__"

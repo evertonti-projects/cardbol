@@ -460,10 +460,14 @@ finalVictoryAudio.volume = GOAL_AUDIO_VOLUME;
 // ============================================================
 // COMENTARISTA DO CARDBOL
 // Arquivos esperados em: audios/comentarios/
-// - Início da partida: sempre toca 1 das 5 variações.
-// - Gol no modo CPU (1º ao 4º): 80% de chance.
-//   O áudio do comentarista usa um canal separado e pode tocar junto
-//   com os efeitos normais de gol do jogo.
+// - Início da partida: 100%.
+// - 1º ao 4º gol no modo CPU: 80%.
+// - 5º gol / título: 100%.
+// - Vitória por tempo/desconexão: 100%.
+// - 5 turnos completos sem gol: 60%.
+// - Peça alinhada a até 4 movimentos do gol: 50%.
+// Comentários de gol têm prioridade máxima e interrompem qualquer
+// outra fala do comentarista que esteja tocando ou aguardando.
 // ============================================================
 
 const commentaryAudioGroups = {
@@ -487,6 +491,45 @@ const commentaryAudioGroups = {
         "audios/comentarios/goal-cpu-3.mp3",
         "audios/comentarios/goal-cpu-4.mp3",
         "audios/comentarios/goal-cpu-5.mp3"
+    ],
+    playerVictoryGoal: [
+        "audios/comentarios/goal-vict-player-1.mp3",
+        "audios/comentarios/goal-vict-player-2.mp3",
+        "audios/comentarios/goal-vict-player-3.mp3",
+        "audios/comentarios/goal-vict-player-4.mp3",
+        "audios/comentarios/goal-vict-player-5.mp3",
+        "audios/comentarios/goal-vict-player-6.mp3",
+        "audios/comentarios/goal-vict-player-7.mp3",
+        "audios/comentarios/goal-vict-player-8.mp3"
+    ],
+    cpuVictoryGoal: [
+        "audios/comentarios/goal-vict-cpu-1.mp3",
+        "audios/comentarios/goal-vict-cpu-2.mp3",
+        "audios/comentarios/goal-vict-cpu-3.mp3",
+        "audios/comentarios/goal-vict-cpu-4.mp3"
+    ],
+    playerTimedVictory: [
+        "audios/comentarios/vict-t-player-1.mp3",
+        "audios/comentarios/vict-t-player-2.mp3",
+        "audios/comentarios/vict-t-player-3.mp3",
+        "audios/comentarios/vict-t-player-4.mp3"
+    ],
+    cpuTimedVictory: [
+        "audios/comentarios/vict-t-cpu-1.mp3",
+        "audios/comentarios/vict-t-cpu-2.mp3",
+        "audios/comentarios/vict-t-cpu-3.mp3",
+        "audios/comentarios/vict-t-cpu-4.mp3"
+    ],
+    noGoalFiveTurns: [
+        "audios/comentarios/game-no-goal-1.mp3",
+        "audios/comentarios/game-no-goal-2.mp3"
+    ],
+    nearGoalFourMoves: [
+        "audios/comentarios/4mov-goal-1.mp3",
+        "audios/comentarios/4mov-goal-2.mp3",
+        "audios/comentarios/4mov-goal-3.mp3",
+        "audios/comentarios/4mov-goal-4.mp3",
+        "audios/comentarios/4mov-goal-5.mp3"
     ]
 };
 
@@ -502,20 +545,39 @@ const commentaryAudioPools = Object.fromEntries(
     ])
 );
 
-const commentaryLastIndexes = {
-    initGame: -1,
-    playerGoal: -1,
-    cpuGoal: -1
-};
+const commentaryLastIndexes = Object.fromEntries(
+    Object.keys(commentaryAudioGroups).map(groupName => [groupName, -1])
+);
 
 let commentaryTimer = null;
+let commentaryTimerPriority = -1;
+let activeCommentaryAudio = null;
+let activeCommentaryPriority = -1;
 let initGameCommentaryPlayed = false;
+let matchEndCommentaryPlayed = false;
+let noGoalCompletedTurnCount = 0;
+let nearGoalCommentedPieceKeys = new Set();
+
+function pauseActiveCommentary() {
+    if(!activeCommentaryAudio) return;
+
+    try {
+        activeCommentaryAudio.pause();
+        activeCommentaryAudio.currentTime = 0;
+    } catch(error) {}
+
+    activeCommentaryAudio = null;
+    activeCommentaryPriority = -1;
+}
 
 function stopCommentaryAudio() {
     if(commentaryTimer) {
         clearTimeout(commentaryTimer);
         commentaryTimer = null;
     }
+
+    commentaryTimerPriority = -1;
+    pauseActiveCommentary();
 
     Object.values(commentaryAudioPools).flat().forEach(audio => {
         try {
@@ -543,35 +605,70 @@ function chooseCommentaryAudio(groupName) {
     return pool[index];
 }
 
-function playCommentary(groupName, { chance = 1, delay = 0 } = {}) {
+function playCommentary(
+    groupName,
+    {
+        chance = 1,
+        delay = 0,
+        priority = 20,
+        forceInterrupt = false
+    } = {}
+) {
     if(Math.random() > chance) return false;
+
+    // Uma fala menos importante nunca corta uma fala mais importante em andamento.
+    // Comentários de gol usam prioridade máxima e forceInterrupt=true.
+    if(!forceInterrupt && activeCommentaryAudio && priority < activeCommentaryPriority) {
+        return false;
+    }
+
+    if(!forceInterrupt && commentaryTimer && priority < commentaryTimerPriority) {
+        return false;
+    }
 
     const audio = chooseCommentaryAudio(groupName);
     if(!audio) return false;
 
     const playNow = () => {
         commentaryTimer = null;
+        commentaryTimerPriority = -1;
 
-        // Evita duas falas do comentarista atropelando uma à outra,
-        // mas não interrompe efeitos, música, dado ou áudio de gol.
-        Object.values(commentaryAudioPools).flat().forEach(item => {
-            if(item !== audio) {
-                try {
-                    item.pause();
-                    item.currentTime = 0;
-                } catch(error) {}
-            }
-        });
+        if(!forceInterrupt && activeCommentaryAudio && priority < activeCommentaryPriority) {
+            return;
+        }
+
+        // A fala nova só substitui a atual se tiver prioridade igual/maior.
+        pauseActiveCommentary();
 
         try {
             audio.pause();
             audio.currentTime = 0;
             audio.volume = COMMENTARY_AUDIO_VOLUME;
+
+            activeCommentaryAudio = audio;
+            activeCommentaryPriority = priority;
+
+            audio.onended = () => {
+                if(activeCommentaryAudio === audio) {
+                    activeCommentaryAudio = null;
+                    activeCommentaryPriority = -1;
+                }
+            };
+
             const promise = audio.play();
             if(promise && typeof promise.catch === "function") {
-                promise.catch(() => {});
+                promise.catch(() => {
+                    if(activeCommentaryAudio === audio) {
+                        activeCommentaryAudio = null;
+                        activeCommentaryPriority = -1;
+                    }
+                });
             }
         } catch(error) {
+            if(activeCommentaryAudio === audio) {
+                activeCommentaryAudio = null;
+                activeCommentaryPriority = -1;
+            }
             // Comentário nunca deve bloquear a partida.
         }
     };
@@ -579,9 +676,17 @@ function playCommentary(groupName, { chance = 1, delay = 0 } = {}) {
     if(commentaryTimer) {
         clearTimeout(commentaryTimer);
         commentaryTimer = null;
+        commentaryTimerPriority = -1;
+    }
+
+    // Gol/vitória por gol tem prioridade absoluta: corta fala atual e
+    // qualquer comentário agendado antes dele.
+    if(forceInterrupt) {
+        pauseActiveCommentary();
     }
 
     if(delay > 0) {
+        commentaryTimerPriority = priority;
         commentaryTimer = setTimeout(playNow, delay);
     } else {
         playNow();
@@ -594,19 +699,157 @@ function playInitGameCommentaryOnce() {
     if(initGameCommentaryPlayed || winner !== null) return;
 
     initGameCommentaryPlayed = true;
-    playCommentary("initGame", { chance: 1, delay: 180 });
+    playCommentary("initGame", { chance: 1, delay: 180, priority: 30 });
 }
 
 function playGoalCommentary(scoringPlayer) {
-    // As falas player/CPU desta primeira leva pertencem ao modo Contra CPU.
-    // Em PVP local e online continuamos apenas com os efeitos normais por enquanto.
+    // As falas player/CPU desta leva pertencem ao modo Contra CPU.
     if(!isCpuMode() || winner !== null) return;
 
     if(scoringPlayer === HUMAN_PLAYER) {
-        playCommentary("playerGoal", { chance: 0.8, delay: 420 });
+        playCommentary("playerGoal", {
+            chance: 0.8,
+            delay: 420,
+            priority: 100,
+            forceInterrupt: true
+        });
     } else if(scoringPlayer === CPU_PLAYER) {
-        playCommentary("cpuGoal", { chance: 0.8, delay: 420 });
+        playCommentary("cpuGoal", {
+            chance: 0.8,
+            delay: 420,
+            priority: 100,
+            forceInterrupt: true
+        });
     }
+}
+
+function playVictoryGoalCommentary(scoringPlayer) {
+    if(matchEndCommentaryPlayed) return;
+    matchEndCommentaryPlayed = true;
+
+    if(isCpuMode() && scoringPlayer === CPU_PLAYER) {
+        playCommentary("cpuVictoryGoal", {
+            chance: 1,
+            delay: 300,
+            priority: 110,
+            forceInterrupt: true
+        });
+        return;
+    }
+
+    // Jogador humano: CPU, PVP local ou o dispositivo que efetivamente marcou no online.
+    playCommentary("playerVictoryGoal", {
+        chance: 1,
+        delay: 300,
+        priority: 110,
+        forceInterrupt: true
+    });
+}
+
+function shouldPlayPlayerTimedVictoryHere(winningPlayer) {
+    if(isCpuMode()) return winningPlayer === HUMAN_PLAYER;
+
+    if(isOnlineMode()) {
+        const localPlayer = getOnlineLocalPlayerIndex();
+        return localPlayer === winningPlayer;
+    }
+
+    return true;
+}
+
+function playNonGoalVictoryCommentary(winningPlayer, reason = matchEndReason) {
+    if(matchEndCommentaryPlayed) return;
+
+    const isTimedResult = reason === "time" || reason === "pieces";
+    const isDisconnectResult = reason === "interruptions" || reason === "reconnect_timeout" || reason === "disconnect";
+
+    if(!isTimedResult && !isDisconnectResult) return;
+
+    if(isCpuMode() && winningPlayer === CPU_PLAYER) {
+        matchEndCommentaryPlayed = true;
+        playCommentary("cpuTimedVictory", {
+            chance: 1,
+            delay: 260,
+            priority: 90,
+            forceInterrupt: true
+        });
+        return;
+    }
+
+    if(shouldPlayPlayerTimedVictoryHere(winningPlayer)) {
+        matchEndCommentaryPlayed = true;
+        playCommentary("playerTimedVictory", {
+            chance: 1,
+            delay: 260,
+            priority: 90,
+            forceInterrupt: true
+        });
+    }
+}
+
+function resetGoalDroughtCommentaryTracking() {
+    noGoalCompletedTurnCount = 0;
+    nearGoalCommentedPieceKeys.clear();
+}
+
+function maybePlayFiveTurnsWithoutGoalCommentary() {
+    noGoalCompletedTurnCount++;
+
+    if(noGoalCompletedTurnCount < 5) return;
+
+    noGoalCompletedTurnCount = 0;
+    playCommentary("noGoalFiveTurns", {
+        chance: 0.6,
+        delay: 260,
+        priority: 10
+    });
+}
+
+function getNearGoalDangerKey(piece) {
+    return `${piece.player}:${piece.id}`;
+}
+
+function pieceIsWithinFourMovesOfGoal(piece) {
+    if(!piece || piece.row < 0 || piece.row >= ROWS) return false;
+    if(!goalColumns.includes(piece.col)) return false;
+
+    return cpuGoalDistance(piece.player, piece.row) <= 4;
+}
+
+function maybePlayNearGoalCommentary(outgoingPlayer) {
+    const currentDangerKeys = new Set(
+        pieces
+            .filter(piece => pieceIsWithinFourMovesOfGoal(piece))
+            .map(piece => getNearGoalDangerKey(piece))
+    );
+
+    // Se uma peça saiu da zona de perigo, ela poderá gerar comentário
+    // novamente quando voltar a entrar no futuro.
+    nearGoalCommentedPieceKeys = new Set(
+        [...nearGoalCommentedPieceKeys].filter(key => currentDangerKeys.has(key))
+    );
+
+    const newThreats = pieces.filter(piece => {
+        if(piece.player !== outgoingPlayer) return false;
+        if(!pieceIsWithinFourMovesOfGoal(piece)) return false;
+
+        const key = getNearGoalDangerKey(piece);
+        return !nearGoalCommentedPieceKeys.has(key);
+    });
+
+    if(!newThreats.length) return;
+
+    // Registra todas as novas ameaças antes do sorteio para não repetir
+    // a mesma situação a cada turno se a fala não cair nos 50%.
+    newThreats.forEach(piece => {
+        nearGoalCommentedPieceKeys.add(getNearGoalDangerKey(piece));
+    });
+
+    playCommentary("nearGoalFourMoves", {
+        chance: 0.5,
+        delay: 180,
+        priority: 20
+    });
 }
 
 let nextGoalCelebrationAudioIndex = 0;
@@ -12342,6 +12585,11 @@ function passTurn(reason = "normal") {
         setMessage(`🔴 ${playerName(1)}: jogue o dado.`);
     }
 
+    // Um turno foi concluído sem gol. Avalia os comentários de ritmo
+    // e de peça posicionada a até 4 movimentos do gol.
+    maybePlayFiveTurnsWithoutGoalCommentary();
+    maybePlayNearGoalCommentary(outgoingPlayer);
+
     render();
     scheduleCpuIfNeeded(850);
 }
@@ -12540,6 +12788,8 @@ function startGoalFieldEffects(scoringPlayer) {
 
 function registerGoal(scoringPlayer, scoringPiece = null) {
 
+    resetGoalDroughtCommentaryTracking();
+
     if(goalPause || winner !== null) {
         return;
     }
@@ -12613,6 +12863,7 @@ function registerGoal(scoringPlayer, scoringPiece = null) {
             scheduleOnlineStatePublish(true);
         }
 
+        playVictoryGoalCommentary(scoringPlayer);
         showVictory(true, scoringPlayer);
         return;
 
@@ -13116,6 +13367,10 @@ function playFinalVictoryAudio() {
 
 function showVictory(matchEnded = false, scoringPlayer = currentPlayer) {
 
+    if(matchEnded && matchEndReason !== "goals") {
+        playNonGoalVictoryCommentary(scoringPlayer, matchEndReason);
+    }
+
     if(matchEnded) {
         if(isOnlineMode()) {
             // O multiplayer ainda está em beta. O resultado online será
@@ -13404,6 +13659,8 @@ function newGame() {
     // qualquer comentário pendente da partida anterior.
     stopCommentaryAudio();
     initGameCommentaryPlayed = false;
+    matchEndCommentaryPlayed = false;
+    resetGoalDroughtCommentaryTracking();
 
     // Reiniciar leva novamente à formação: sorteia uma trilha ambiente.
     startMenuMusic({ forceNewTrack: true });

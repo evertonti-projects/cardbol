@@ -1293,6 +1293,170 @@ function hidePlayerIdentityOverlay() {
 }
 
 // ============================================================
+// MINI GAME — PÊNALTIS CARDBOL / PROTÓTIPO
+// ============================================================
+let penaltyCpuZone = 0;
+let penaltyShotLocked = false;
+let penaltyGoals = 0;
+let penaltySaves = 0;
+
+function randomPenaltyZone() {
+    return Math.floor(Math.random() * 6);
+}
+
+function launchPenaltyMiniGame() {
+    hideCardBolHub();
+    stopMenuMusicImmediately();
+
+    const overlay = document.getElementById("penaltyMiniGameOverlay");
+    if(!overlay) return;
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+    resetPenaltyTestRound();
+}
+
+function exitPenaltyMiniGame() {
+    const overlay = document.getElementById("penaltyMiniGameOverlay");
+    if(overlay) {
+        overlay.classList.remove("show");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+    showCardBolHub();
+}
+
+function updatePenaltyTestScore() {
+    const score = document.getElementById("penaltyTestScore");
+    if(score) score.textContent = `GOLS ${penaltyGoals} • DEFESAS ${penaltySaves}`;
+}
+
+function resetPenaltyTestRound() {
+    penaltyShotLocked = false;
+    penaltyCpuZone = randomPenaltyZone();
+
+    const pitch = document.querySelector("#penaltyMiniGameOverlay .penalty-pitch");
+    const ball = document.getElementById("penaltyBall");
+    const keeper = document.getElementById("penaltyGoalkeeper");
+    const kicker = document.getElementById("penaltyKicker");
+    const result = document.getElementById("penaltyResult");
+    const instruction = document.getElementById("penaltyInstruction");
+    const again = document.getElementById("penaltyAgainButton");
+
+    pitch?.classList.remove("is-shooting");
+    [ball, keeper, kicker].forEach(el => {
+        if(!el) return;
+        el.getAnimations().forEach(anim => anim.cancel());
+        el.style.removeProperty("transform");
+        el.style.removeProperty("opacity");
+    });
+
+    if(result) {
+        result.className = "penalty-result";
+        result.textContent = "";
+    }
+    if(instruction) {
+        instruction.style.display = "block";
+        instruction.textContent = "A CPU já escolheu o canto do goleiro. Toque em uma das 6 zonas do gol.";
+    }
+    if(again) again.style.display = "none";
+    updatePenaltyTestScore();
+}
+
+function getPenaltyTargetDelta(element, zoneElement) {
+    const a = element.getBoundingClientRect();
+    const z = zoneElement.getBoundingClientRect();
+    return {
+        x: (z.left + z.width / 2) - (a.left + a.width / 2),
+        y: (z.top + z.height / 2) - (a.top + a.height / 2)
+    };
+}
+
+function animatePenaltyKicker() {
+    const kicker = document.getElementById("penaltyKicker");
+    if(!kicker) return null;
+    return kicker.animate([
+        { transform: "translateX(-50%) translate(0,0) rotate(0deg)" },
+        { transform: "translateX(-50%) translate(-14px,-4px) rotate(-1deg)", offset: .25 },
+        { transform: "translateX(-50%) translate(-58px,-36px) rotate(-7deg)", offset: .72 },
+        { transform: "translateX(-50%) translate(-72px,-42px) rotate(5deg)" }
+    ], { duration: 520, easing: "cubic-bezier(.36,.05,.22,1)", fill: "forwards" });
+}
+
+function animatePenaltyBall(zoneIndex) {
+    const ball = document.getElementById("penaltyBall");
+    const zone = document.querySelector(`.penalty-zone[data-zone="${zoneIndex}"]`);
+    if(!ball || !zone) return null;
+
+    const {x, y} = getPenaltyTargetDelta(ball, zone);
+    return ball.animate([
+        { transform: "translate(-50%,50%) translate(0,0) scale(1) rotate(0deg)" },
+        { transform: `translate(-50%,50%) translate(${x * .48}px, ${y * .48 - 16}px) scale(.68) rotate(190deg)`, offset: .48 },
+        { transform: `translate(-50%,50%) translate(${x}px, ${y}px) scale(.38) rotate(420deg)` }
+    ], { duration: 620, easing: "cubic-bezier(.20,.72,.22,1)", fill: "forwards" });
+}
+
+function animatePenaltyKeeper(zoneIndex) {
+    const keeper = document.getElementById("penaltyGoalkeeper");
+    const zone = document.querySelector(`.penalty-zone[data-zone="${zoneIndex}"]`);
+    if(!keeper || !zone) return null;
+
+    const {x, y} = getPenaltyTargetDelta(keeper, zone);
+    const angle = Math.max(-24, Math.min(24, x / 7));
+    const keeperX = x * .72;
+    const keeperY = y * .48;
+
+    return keeper.animate([
+        { transform: "translateX(-50%) translate(0,0) rotate(0deg) scale(1)" },
+        { transform: "translateX(-50%) translate(0,-6px) rotate(0deg) scale(.98)", offset: .18 },
+        { transform: `translateX(-50%) translate(${keeperX}px, ${keeperY}px) rotate(${angle}deg) scale(.93)` }
+    ], { duration: 520, easing: "cubic-bezier(.18,.75,.22,1)", fill: "forwards" });
+}
+
+function finishPenaltyTestRound(saved) {
+    const result = document.getElementById("penaltyResult");
+    const instruction = document.getElementById("penaltyInstruction");
+    const again = document.getElementById("penaltyAgainButton");
+
+    if(saved) penaltySaves += 1;
+    else penaltyGoals += 1;
+    updatePenaltyTestScore();
+
+    if(result) {
+        result.className = `penalty-result show ${saved ? "save" : "goal"}`;
+        result.textContent = saved ? "DEFENDEU!" : "GOOOOL!";
+    }
+    if(instruction) instruction.style.display = "none";
+    if(again) again.style.display = "block";
+}
+
+function takePenaltyShot(zoneIndex) {
+    if(penaltyShotLocked) return;
+    if(zoneIndex < 0 || zoneIndex > 5) return;
+
+    penaltyShotLocked = true;
+    const saved = zoneIndex === penaltyCpuZone;
+    const pitch = document.querySelector("#penaltyMiniGameOverlay .penalty-pitch");
+    const instruction = document.getElementById("penaltyInstruction");
+
+    pitch?.classList.add("is-shooting");
+    if(instruction) instruction.textContent = "CHUTOU!";
+
+    animatePenaltyKicker();
+
+    setTimeout(() => {
+        animatePenaltyBall(zoneIndex);
+    }, 285);
+
+    setTimeout(() => {
+        animatePenaltyKeeper(penaltyCpuZone);
+    }, 330);
+
+    setTimeout(() => {
+        finishPenaltyTestRound(saved);
+    }, 980);
+}
+
+// ============================================================
 // CENTRAL DE JOGOS — LOGIN PRIMEIRO
 // A página inicia na autenticação; após o login, o usuário
 // escolhe qual experiência CardBol deseja abrir.
@@ -1301,6 +1465,12 @@ function showCardBolHub() {
     const hub = document.getElementById("cardbolHubOverlay");
     const user = document.getElementById("cardbolHubUser");
     const opening = document.getElementById("openingScreen");
+    const penaltyOverlay = document.getElementById("penaltyMiniGameOverlay");
+
+    if(penaltyOverlay) {
+        penaltyOverlay.classList.remove("show");
+        penaltyOverlay.setAttribute("aria-hidden", "true");
+    }
 
     if(opening) opening.style.display = "none";
     if(!hub) {

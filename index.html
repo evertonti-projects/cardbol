@@ -158,12 +158,64 @@
                 </span>
                 <span class="cardbol-game-action">JOGAR <b>›</b></span>
             </button>
+
+            <button class="cardbol-game-card penalty-hub-card" type="button" onclick="launchPenaltyMiniGame()" aria-label="Abrir Pênaltis CardBol">
+                <span class="cardbol-game-card-scan" aria-hidden="true"></span>
+                <img src="imagens/mini-game-penalty/bola.png" alt="" class="cardbol-game-icon penalty-hub-ball">
+                <span class="cardbol-game-copy">
+                    <strong>PÊNALTIS</strong>
+                    <small>CARDBOL • TESTE DE ANIMAÇÃO</small>
+                </span>
+                <span class="cardbol-game-action">TESTAR <b>›</b></span>
+            </button>
         </section>
 
         <footer class="cardbol-hub-footer">
             <span class="hub-status-dot"></span> SISTEMA ONLINE
         </footer>
     </main>
+</div>
+
+<!-- Mini game experimental: Pênaltis CardBol -->
+<div id="penaltyMiniGameOverlay" class="penalty-mini-overlay" aria-hidden="true">
+    <div class="penalty-mini-stage">
+        <header class="penalty-mini-header">
+            <button type="button" class="penalty-back-button" onclick="exitPenaltyMiniGame()">‹ CENTRAL DE JOGOS</button>
+            <div class="penalty-mini-title-wrap">
+                <div class="penalty-mini-kicker">MINI GAME • PROTÓTIPO</div>
+                <h2>PÊNALTIS CARDBOL</h2>
+            </div>
+            <div id="penaltyTestScore" class="penalty-test-score">GOLS 0 • DEFESAS 0</div>
+        </header>
+
+        <main class="penalty-pitch">
+            <div id="penaltyGoal" class="penalty-goal" aria-label="Escolha onde chutar">
+                <div class="penalty-goal-net" aria-hidden="true"></div>
+                <div class="penalty-zones">
+                    <button type="button" class="penalty-zone" data-zone="0" onclick="takePenaltyShot(0)" aria-label="Chutar no alto à esquerda"><span>↖</span></button>
+                    <button type="button" class="penalty-zone" data-zone="1" onclick="takePenaltyShot(1)" aria-label="Chutar no alto ao centro"><span>↑</span></button>
+                    <button type="button" class="penalty-zone" data-zone="2" onclick="takePenaltyShot(2)" aria-label="Chutar no alto à direita"><span>↗</span></button>
+                    <button type="button" class="penalty-zone" data-zone="3" onclick="takePenaltyShot(3)" aria-label="Chutar embaixo à esquerda"><span>↙</span></button>
+                    <button type="button" class="penalty-zone" data-zone="4" onclick="takePenaltyShot(4)" aria-label="Chutar embaixo ao centro"><span>↓</span></button>
+                    <button type="button" class="penalty-zone" data-zone="5" onclick="takePenaltyShot(5)" aria-label="Chutar embaixo à direita"><span>↘</span></button>
+                </div>
+                <img id="penaltyGoalkeeper" src="imagens/mini-game-penalty/goleiro-teste.png" alt="Goleiro" class="penalty-goalkeeper">
+            </div>
+
+            <div class="penalty-spot" aria-hidden="true"></div>
+            <img id="penaltyBall" src="imagens/mini-game-penalty/bola.png" alt="Bola" class="penalty-ball">
+            <img id="penaltyKicker" src="imagens/mini-game-penalty/batedor-teste.png" alt="Batedor" class="penalty-kicker-player">
+
+            <div id="penaltyInstruction" class="penalty-instruction">
+                A CPU já escolheu o canto do goleiro. Toque em uma das 6 zonas do gol.
+            </div>
+
+            <div id="penaltyResult" class="penalty-result" aria-live="polite"></div>
+            <button id="penaltyAgainButton" type="button" class="penalty-again-button" onclick="resetPenaltyTestRound()" style="display:none;">
+                COBRAR NOVAMENTE
+            </button>
+        </main>
+    </div>
 </div>
 
 <div id="rulesOverlay" class="rules-overlay" aria-hidden="true">

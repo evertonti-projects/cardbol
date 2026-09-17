@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pênaltis CardBol</title>
+    <meta name="description" content="Pênaltis CardBol - Mini game de cobranças de pênalti.">
+    <meta name="theme-color" content="#08111f">
+    <link rel="icon" href="../imagens/geral/favicon-32x32.ico" sizes="any">
+    <link rel="stylesheet" href="penalty.css">
+</head>
+<body>
+    <main class="penalty-app" id="penaltyMiniGameOverlay">
+        <header class="penalty-mini-header">
+            <button type="button" class="penalty-back-button" id="penaltyBackButton">‹ CENTRAL DE JOGOS</button>
+            <div class="penalty-mini-title-wrap">
+                <div class="penalty-mini-kicker">CARDBOL • MINI GAME</div>
+                <h1>PÊNALTIS CARDBOL</h1>
+            </div>
+            <div id="penaltyTestScore" class="penalty-test-score">GOLS 0 • DEFESAS 0</div>
+        </header>
+
+        <section class="penalty-pitch" aria-label="Campo de cobrança de pênalti">
+            <div id="penaltyGoal" class="penalty-goal" aria-label="Escolha onde chutar">
+                <div class="penalty-goal-net" aria-hidden="true"></div>
+                <div class="penalty-zones">
+                    <button type="button" class="penalty-zone" data-zone="0" aria-label="Chutar no alto à esquerda"><span>↖</span></button>
+                    <button type="button" class="penalty-zone" data-zone="1" aria-label="Chutar no alto ao centro"><span>↑</span></button>
+                    <button type="button" class="penalty-zone" data-zone="2" aria-label="Chutar no alto à direita"><span>↗</span></button>
+                    <button type="button" class="penalty-zone" data-zone="3" aria-label="Chutar embaixo à esquerda"><span>↙</span></button>
+                    <button type="button" class="penalty-zone" data-zone="4" aria-label="Chutar embaixo ao centro"><span>↓</span></button>
+                    <button type="button" class="penalty-zone" data-zone="5" aria-label="Chutar embaixo à direita"><span>↘</span></button>
+                </div>
+                <img id="penaltyGoalkeeper" src="../imagens/mini-game-penalty/goleiro-teste.png" alt="Goleiro" class="penalty-goalkeeper">
+            </div>
+
+            <div class="penalty-spot" aria-hidden="true"></div>
+            <img id="penaltyBall" src="../imagens/mini-game-penalty/bola.png" alt="Bola" class="penalty-ball">
+            <img id="penaltyKicker" src="../imagens/mini-game-penalty/batedor-teste.png" alt="Batedor" class="penalty-kicker-player">
+
+            <div id="penaltyInstruction" class="penalty-instruction">
+                A CPU já escolheu o canto do goleiro. Toque em uma das 6 zonas do gol.
+            </div>
+
+            <div id="penaltyResult" class="penalty-result" aria-live="polite"></div>
+            <button id="penaltyAgainButton" type="button" class="penalty-again-button" hidden>
+                COBRAR NOVAMENTE
+            </button>
+        </section>
+    </main>
+
+    <script src="penalty.js"></script>
+</body>
+</html>

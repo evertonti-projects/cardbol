@@ -1153,16 +1153,26 @@ const CPU_MANAGE_RESULT_CHANCE = 0.80;
 const CPU_MANAGE_RESULT_FIRST_HALF_WINDOW_MS = 5 * 60 * 1000;
 const CPU_MANAGE_RESULT_DELAYS_MS = [10_000, 20_000, 30_000];
 
-// Tempo-base de "pensamento" da CPU em qualquer jogada importante.
-// É sempre somado ao pequeno delay técnico já existente.
-// Quando a CPU está fazendo cera, o tempo de cera é acrescentado por cima.
-const CPU_BASE_THINK_MIN_MS = 3_000;
-const CPU_BASE_THINK_MAX_MS = 7_000;
+// Tempos de "pensamento" da CPU.
+// Antes de decidir entre carta ou dado: 2–5 s.
+// Depois do dado, antes de decidir a jogada: 1–3 s.
+// Quando a CPU está fazendo cera, o tempo de cera é acrescentado por cima
+// do delay pré-ação normal.
+const CPU_PRE_ACTION_THINK_MIN_MS = 2_000;
+const CPU_PRE_ACTION_THINK_MAX_MS = 5_000;
+const CPU_POST_DICE_THINK_MIN_MS = 1_000;
+const CPU_POST_DICE_THINK_MAX_MS = 3_000;
 
-function cpuRandomThinkingDelayMs() {
-    return CPU_BASE_THINK_MIN_MS + Math.floor(
-        Math.random() * (CPU_BASE_THINK_MAX_MS - CPU_BASE_THINK_MIN_MS + 1)
-    );
+function cpuRandomDelayMs(minMs, maxMs) {
+    return minMs + Math.floor(Math.random() * (maxMs - minMs + 1));
+}
+
+function cpuRandomPreActionDelayMs() {
+    return cpuRandomDelayMs(CPU_PRE_ACTION_THINK_MIN_MS, CPU_PRE_ACTION_THINK_MAX_MS);
+}
+
+function cpuRandomPostDiceDelayMs() {
+    return cpuRandomDelayMs(CPU_POST_DICE_THINK_MIN_MS, CPU_POST_DICE_THINK_MAX_MS);
 }
 
 const CPU_MOOD_CHANCE = 0.40; // 2 de cada 5 turnos
@@ -6758,7 +6768,7 @@ function scheduleCpuAfterDice(delay=700) {
 
     // Depois de ver o dado, a CPU também leva um tempo variável para
     // analisar movimento, gol direto e eventual uso de carta pós-dado.
-    const thinkingDelay = cpuRandomThinkingDelayMs();
+    const thinkingDelay = cpuRandomPostDiceDelayMs();
     const scheduledDelay = Math.max(0, delay) + thinkingDelay;
 
     cpuThinking = true;
@@ -6833,9 +6843,9 @@ function scheduleCpuIfNeeded(delay=850) {
     cpuPrepareManageResultForTurn();
     cpuMaybeShowMoodForTurn();
 
-    // Toda entrada de decisão da CPU recebe um tempo-base aleatório de 3–7 s.
+    // Toda entrada de decisão da CPU recebe um tempo-base aleatório de 2–5 s.
     // O delay recebido pela função (normalmente < 1 s) continua sendo somado.
-    const baseThinkingDelay = cpuRandomThinkingDelayMs();
+    const baseThinkingDelay = cpuRandomPreActionDelayMs();
     let scheduledDelay = Math.max(0, delay) + baseThinkingDelay;
 
     if(cpuManageResultThisTurn && !cpuManageResultDelayApplied) {

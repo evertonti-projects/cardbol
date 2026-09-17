@@ -15,11 +15,18 @@ const ASSETS = {
   ]
 };
 
-const KEEPER_ART_SCALE = {
-  idle: .88,
-  happy: 1.12,
-  sad: .90,
-  zones: [1.00, 1.00, 1.00, .78, .78, .78]
+const KEEPER_POSE = {
+  idle: { scale: .88, imgX: 0, imgY: 0 },
+  happy: { scale: 1.02, imgX: 0, imgY: -2 },
+  sad: { scale: .90, imgX: 0, imgY: 0 },
+  zones: [
+    { scale: .98, imgX: -18, imgY: -8, moveX: -44, moveY: -34, shadowX: -18, shadowScale: .56 },
+    { scale: .96, imgX: 0, imgY: -18, moveX: 0, moveY: -38, shadowX: 0, shadowScale: .52 },
+    { scale: .98, imgX: 18, imgY: -8, moveX: 44, moveY: -34, shadowX: 18, shadowScale: .56 },
+    { scale: .76, imgX: -24, imgY: 10, moveX: -36, moveY: 8, shadowX: -14, shadowScale: .68 },
+    { scale: .74, imgX: 0, imgY: 12, moveX: 0, moveY: 10, shadowX: 0, shadowScale: .64 },
+    { scale: .76, imgX: 24, imgY: 10, moveX: 36, moveY: 8, shadowX: 14, shadowScale: .68 }
+  ]
 };
 
 let shotLocked = false;
@@ -100,10 +107,12 @@ function cancelAnimations(...elements) {
   });
 }
 
-function setKeeper(src, artScale = 1) {
+function setKeeper(src, pose = {}) {
   const keeper = $("penaltyGoalkeeper");
   keeper.src = src;
-  keeper.style.setProperty("--keeper-art-scale", artScale);
+  keeper.style.setProperty("--keeper-art-scale", pose.scale ?? 1);
+  keeper.style.setProperty("--keeper-img-x", `${pose.imgX ?? 0}%`);
+  keeper.style.setProperty("--keeper-img-y", `${pose.imgY ?? 0}%`);
 }
 
 function resetRound() {
@@ -121,7 +130,7 @@ function resetRound() {
   cancelAnimations(keeperBox, keeperShadow, ball, ballShadow);
   app.classList.remove("is-shooting", "impact-goal", "impact-save");
 
-  setKeeper(ASSETS.idle, KEEPER_ART_SCALE.idle);
+  setKeeper(ASSETS.idle, KEEPER_POSE.idle);
   keeperBox.style.transform = "translate(0,0) scale(1)";
   keeperShadow.style.transform = "translateX(-50%) scale(1)";
   keeperShadow.style.opacity = ".34";
@@ -195,37 +204,27 @@ function animateBall(zoneIndex, saved) {
   });
 }
 
-function keeperMoveForZone(zoneIndex) {
-  const col = zoneIndex % 3;
-  const high = zoneIndex < 3;
-  const side = col === 0 ? -1 : col === 2 ? 1 : 0;
-  const lateralBoost = 1.30; // 30% mais para os lados
-  const verticalBoost = 1.30; // 30% mais para cima nas bolas altas
-  return {
-    x: side * (high ? 6.0 * lateralBoost : 4.2 * lateralBoost),
-    y: high ? -1.8 * verticalBoost : 1.1,
-    shadowX: side * 4.6 * lateralBoost,
-    shadowScale: high ? .58 : .72
-  };
+function keeperPoseForZone(zoneIndex) {
+  return KEEPER_POSE.zones[zoneIndex];
 }
 
 function animateKeeper(zoneIndex) {
   const box = $("keeperBox");
   const shadow = $("keeperShadow");
-  const move = keeperMoveForZone(zoneIndex);
+  const move = keeperPoseForZone(zoneIndex);
 
   box.animate([
     { transform: "translate(0,0) scale(1)" },
-    { transform: "translate(0,1.1%) scale(1,.98)", offset: .20 },
-    { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1)`, offset: .38 }
+    { transform: "translate(0,2.2%) scale(1,.98)", offset: .20 },
+    { transform: `translate(${move.moveX * .32}%, ${move.moveY * .32}%) scale(1)`, offset: .38 }
   ], { duration: 170, easing: "ease-out", fill: "forwards" });
 
   schedule(() => {
-    setKeeper(ASSETS.zones[zoneIndex], KEEPER_ART_SCALE.zones[zoneIndex]);
+    setKeeper(ASSETS.zones[zoneIndex], move);
     box.animate([
-      { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1)` },
-      { transform: `translate(${move.x}%, ${move.y}%) scale(1)`, offset: .68 },
-      { transform: `translate(${move.x * .94}%, ${move.y + .25}%) scale(1)` }
+      { transform: `translate(${move.moveX * .32}%, ${move.moveY * .32}%) scale(1)` },
+      { transform: `translate(${move.moveX}%, ${move.moveY}%) scale(1)`, offset: .68 },
+      { transform: `translate(${move.moveX * .98}%, ${move.moveY}%) scale(1)` }
     ], { duration: 470, easing: "cubic-bezier(.12,.76,.20,1)", fill: "forwards" });
   }, 135);
 
@@ -244,7 +243,7 @@ function impact(saved) {
 
 function showReaction(saved) {
   const box = $("keeperBox");
-  setKeeper(saved ? ASSETS.happy : ASSETS.sad, saved ? KEEPER_ART_SCALE.happy : KEEPER_ART_SCALE.sad);
+  setKeeper(saved ? ASSETS.happy : ASSETS.sad, saved ? KEEPER_POSE.happy : KEEPER_POSE.sad);
   box.animate([
     { transform: "translate(0,0)" },
     { transform: "translate(0,-.45%)", offset: .52 },

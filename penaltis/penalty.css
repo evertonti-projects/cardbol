@@ -149,7 +149,7 @@ button { font: inherit; }
   height: 100%;
   object-fit: contain;
   object-position: center bottom;
-  transform: scale(var(--keeper-art-scale, 1));
+  transform: translate(var(--keeper-img-x, 0%), var(--keeper-img-y, 0%)) scale(var(--keeper-art-scale, 1));
   transform-origin: center bottom;
   opacity: 1 !important;
   filter: drop-shadow(0 9px 8px rgba(0,0,0,.34));

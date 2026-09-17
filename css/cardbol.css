@@ -8535,3 +8535,102 @@ body.cardbol-level-3 .ranking-level-info strong {
         font-size: 5px !important;
     }
 }
+
+
+/* =========================================================
+   MENU INTERATIVO NO RETRATO + TOUCH/DRAG
+========================================================= */
+@media (orientation: portrait) and (max-width: 700px) {
+    .team-select-layout {
+        position: relative;
+        width: 100% !important;
+        grid-template-columns: 1fr 116px !important;
+        gap: 0 !important;
+        max-height: calc(100dvh - 122px) !important;
+        min-height: calc(100dvh - 122px) !important;
+        align-items: stretch !important;
+    }
+
+    .team-select-grid-left {
+        display: none !important;
+    }
+
+    .team-select-center {
+        grid-column: 1 !important;
+        min-height: calc(100dvh - 122px) !important;
+    }
+
+    .team-select-grid-right {
+        grid-column: 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: flex-end !important;
+        gap: 12px !important;
+        padding: 0 18px 0 0 !important;
+        min-height: calc(100dvh - 122px) !important;
+        touch-action: none !important;
+        user-select: none !important;
+    }
+
+    .team-select-grid-right > *:nth-child(1) { --curve-shift: -4px !important; }
+    .team-select-grid-right > *:nth-child(2) { --curve-shift: -16px !important; }
+    .team-select-grid-right > *:nth-child(3) { --curve-shift: -16px !important; }
+    .team-select-grid-right > *:nth-child(4) { --curve-shift: -4px !important; }
+
+    .team-select-mobile-nav {
+        position: absolute;
+        right: 6px;
+        top: 10px;
+        bottom: 10px;
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+    }
+
+    .team-select-mobile-nav.show {
+        display: flex;
+    }
+
+    .team-select-nav-button {
+        pointer-events: auto;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .team-card,
+    .team-card-locked {
+        width: 100px !important;
+        min-width: 100px !important;
+        padding: 3px 0 4px !important;
+    }
+
+    .team-card-logo {
+        width: 30px !important;
+        height: 30px !important;
+    }
+
+    .team-card-label {
+        max-width: 94px !important;
+        font-size: 8.5px !important;
+        line-height: 1.04 !important;
+        letter-spacing: .01em !important;
+    }
+
+    .team-card-role,
+    .team-card-locked,
+    .team-card-locked::before {
+        font-size: 6px !important;
+        line-height: 1 !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .team-select-grid-right {
+        touch-action: none !important;
+        user-select: none !important;
+    }
+}

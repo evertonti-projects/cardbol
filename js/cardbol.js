@@ -97,6 +97,9 @@ let teamAssignments = {
 let teamSelectionPlayer = 1;
 let teamMenuMobileScrollIndex = 0;
 const TEAM_MENU_MOBILE_VISIBLE_COUNT = 4;
+let teamMenuTouchStartY = 0;
+let teamMenuTouchDragging = false;
+let suppressTeamMenuClickUntil = 0;
 
 const MAX_CARDS = 3;
 const MAX_TEAM_PIECES = 10;
@@ -4137,12 +4140,47 @@ function updateTeamSelectMobileNav(totalItems, enabled) {
 }
 
 function scrollTeamMenu(direction) {
-    if(!isLandscapeMobileTeamMenu()) return;
+    if(!isLandscapeMobileTeamMenu() && !isPortraitMobileTeamMenu()) return;
 
     const totalItems = 12;
     const maxIndex = Math.max(0, totalItems - TEAM_MENU_MOBILE_VISIBLE_COUNT);
     teamMenuMobileScrollIndex = Math.max(0, Math.min(maxIndex, teamMenuMobileScrollIndex + direction));
     populateTeamSelectGrid();
+}
+
+function initTeamMenuTouchControls() {
+    const rightGrid = document.getElementById("teamSelectGridRight");
+    if(!rightGrid || rightGrid.dataset.touchReady === "1") return;
+
+    rightGrid.dataset.touchReady = "1";
+
+    rightGrid.addEventListener("pointerdown", (event) => {
+        if(!isLandscapeMobileTeamMenu() && !isPortraitMobileTeamMenu()) return;
+        teamMenuTouchStartY = event.clientY;
+        teamMenuTouchDragging = false;
+    }, { passive: true });
+
+    rightGrid.addEventListener("pointermove", (event) => {
+        if(!isLandscapeMobileTeamMenu() && !isPortraitMobileTeamMenu()) return;
+        const deltaY = event.clientY - teamMenuTouchStartY;
+        if(Math.abs(deltaY) < 28) return;
+
+        teamMenuTouchDragging = true;
+        suppressTeamMenuClickUntil = Date.now() + 250;
+        scrollTeamMenu(deltaY > 0 ? -1 : 1);
+        teamMenuTouchStartY = event.clientY;
+        event.preventDefault();
+    }, { passive: false });
+
+    const endDrag = () => {
+        setTimeout(() => {
+            teamMenuTouchDragging = false;
+        }, 40);
+    };
+
+    rightGrid.addEventListener("pointerup", endDrag, { passive: true });
+    rightGrid.addEventListener("pointercancel", endDrag, { passive: true });
+    rightGrid.addEventListener("pointerleave", endDrag, { passive: true });
 }
 
 function populateTeamSelectGrid() {
@@ -4208,7 +4246,8 @@ function populateTeamSelectGrid() {
     if(leftGrid && rightGrid) {
         if(portraitMobile) {
             leftGrid.innerHTML = "";
-            rightGrid.innerHTML = portraitOrderedItems.map(renderItem).join("");
+            const visibleItems = portraitOrderedItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
+            rightGrid.innerHTML = visibleItems.map(renderItem).join("");
         } else if(landscapeMobile) {
             leftGrid.innerHTML = "";
             const visibleItems = landscapeMobileItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
@@ -4220,7 +4259,8 @@ function populateTeamSelectGrid() {
         if(grid) grid.innerHTML = "";
     } else if(grid) {
         if(portraitMobile) {
-            grid.innerHTML = portraitOrderedItems.map(renderItem).join("");
+            const visibleItems = portraitOrderedItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
+            grid.innerHTML = visibleItems.map(renderItem).join("");
         } else if(landscapeMobile) {
             const visibleItems = landscapeMobileItems.slice(teamMenuMobileScrollIndex, teamMenuMobileScrollIndex + TEAM_MENU_MOBILE_VISIBLE_COUNT);
             grid.innerHTML = visibleItems.map(renderItem).join("");
@@ -4229,7 +4269,8 @@ function populateTeamSelectGrid() {
         }
     }
 
-    updateTeamSelectMobileNav(landscapeMobileItems.length, landscapeMobile);
+    updateTeamSelectMobileNav(12, landscapeMobile || portraitMobile);
+    initTeamMenuTouchControls();
 
     document.querySelectorAll("#teamSelectOverlay .team-card").forEach(card => {
         if(card.dataset.team === teamAssignments[teamSelectionPlayer]) {
@@ -4308,6 +4349,8 @@ function applyTeamBranding() {
 }
 
 function selectSideTeam(teamKey) {
+    if(Date.now() < suppressTeamMenuClickUntil || teamMenuTouchDragging) return;
+
     if(!AVAILABLE_TEAM_KEYS.includes(teamKey)) return;
 
     // 1ª etapa: lado vermelho / jogador humano.

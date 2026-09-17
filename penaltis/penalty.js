@@ -15,6 +15,13 @@ const ASSETS = {
   ]
 };
 
+const KEEPER_ART_SCALE = {
+  idle: .88,
+  happy: 1.12,
+  sad: .90,
+  zones: [1.00, 1.00, 1.00, .78, .78, .78]
+};
+
 let shotLocked = false;
 let cpuZone = 0;
 let goals = 0;
@@ -40,13 +47,36 @@ function fitScene() {
   const scene = $("sceneCanvas");
   const vw = viewport.clientWidth;
   const vh = viewport.clientHeight;
-  const scale = Math.max(vw / SCENE_W, vh / SCENE_H);
-  const w = SCENE_W * scale;
-  const h = SCENE_H * scale;
+  const portrait = vh > vw * 1.08;
+
+  viewport.classList.toggle("portrait-fit", portrait);
+
+  let scale;
+  let w;
+  let h;
+  let left;
+  let top;
+
+  if (portrait) {
+    // No retrato mostramos a largura inteira da arte para nunca cortar as traves.
+    scale = vw / SCENE_W;
+    w = SCENE_W * scale;
+    h = SCENE_H * scale;
+    left = 0;
+    top = Math.max(66, Math.min(108, vh * .065));
+  } else {
+    // No desktop/paisagem mantemos o preenchimento total da tela.
+    scale = Math.max(vw / SCENE_W, vh / SCENE_H);
+    w = SCENE_W * scale;
+    h = SCENE_H * scale;
+    left = (vw - w) / 2;
+    top = (vh - h) / 2;
+  }
+
   scene.style.width = `${w}px`;
   scene.style.height = `${h}px`;
-  scene.style.left = `${(vw - w) / 2}px`;
-  scene.style.top = `${(vh - h) / 2}px`;
+  scene.style.left = `${left}px`;
+  scene.style.top = `${top}px`;
 }
 
 function preloadImages() {
@@ -70,8 +100,10 @@ function cancelAnimations(...elements) {
   });
 }
 
-function setKeeper(src) {
-  $("penaltyGoalkeeper").src = src;
+function setKeeper(src, artScale = 1) {
+  const keeper = $("penaltyGoalkeeper");
+  keeper.src = src;
+  keeper.style.setProperty("--keeper-art-scale", artScale);
 }
 
 function resetRound() {
@@ -89,7 +121,7 @@ function resetRound() {
   cancelAnimations(keeperBox, keeperShadow, ball, ballShadow);
   app.classList.remove("is-shooting", "impact-goal", "impact-save");
 
-  setKeeper(ASSETS.idle);
+  setKeeper(ASSETS.idle, KEEPER_ART_SCALE.idle);
   keeperBox.style.transform = "translate(0,0) scale(1)";
   keeperShadow.style.transform = "translateX(-50%) scale(1)";
   keeperShadow.style.opacity = ".34";
@@ -182,15 +214,15 @@ function animateKeeper(zoneIndex) {
 
   box.animate([
     { transform: "translate(0,0) scale(1)" },
-    { transform: "translate(0,1.1%) scale(1.02,.96)", offset: .20 },
-    { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1.01)`, offset: .38 }
+    { transform: "translate(0,1.1%) scale(1,.98)", offset: .20 },
+    { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1)`, offset: .38 }
   ], { duration: 170, easing: "ease-out", fill: "forwards" });
 
   schedule(() => {
-    setKeeper(ASSETS.zones[zoneIndex]);
+    setKeeper(ASSETS.zones[zoneIndex], KEEPER_ART_SCALE.zones[zoneIndex]);
     box.animate([
-      { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(.98)` },
-      { transform: `translate(${move.x}%, ${move.y}%) scale(1.03)`, offset: .68 },
+      { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1)` },
+      { transform: `translate(${move.x}%, ${move.y}%) scale(1)`, offset: .68 },
       { transform: `translate(${move.x * .94}%, ${move.y + .25}%) scale(1)` }
     ], { duration: 470, easing: "cubic-bezier(.12,.76,.20,1)", fill: "forwards" });
   }, 135);
@@ -210,12 +242,12 @@ function impact(saved) {
 
 function showReaction(saved) {
   const box = $("keeperBox");
-  setKeeper(saved ? ASSETS.happy : ASSETS.sad);
+  setKeeper(saved ? ASSETS.happy : ASSETS.sad, saved ? KEEPER_ART_SCALE.happy : KEEPER_ART_SCALE.sad);
   box.animate([
-    { transform: "translate(0,0) scale(.90)", opacity: .72 },
-    { transform: "translate(0,-1.0%) scale(1.08)", opacity: 1, offset: .52 },
-    { transform: "translate(0,0) scale(1)", opacity: 1 }
-  ], { duration: 430, easing: "cubic-bezier(.17,.80,.22,1.12)", fill: "forwards" });
+    { transform: "translate(0,0)" },
+    { transform: "translate(0,-.45%)", offset: .52 },
+    { transform: "translate(0,0)" }
+  ], { duration: 360, easing: "ease-out", fill: "forwards" });
 }
 
 function finishRound(saved) {

@@ -110,10 +110,10 @@ button { font: inherit; }
 .keeper-box {
   position: absolute;
   z-index: 17;
-  left: 35%;
-  top: 39.7%;
-  width: 30%;
-  height: 20.5%;
+  left: 36.15%;
+  top: 40.8%;
+  width: 27.2%;
+  height: 18.6%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -324,6 +324,13 @@ button { font: inherit; }
   }
   .target-zone span::before { height: 2px; }
   .target-zone span::after { width: 2px; }
+  .keeper-box {
+    left: 35.9%;
+    top: 41.1%;
+    width: 28.8%;
+    height: 18.2%;
+  }
+
 }
 
 @media (max-height: 560px) and (orientation: landscape) {

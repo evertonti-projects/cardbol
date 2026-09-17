@@ -464,7 +464,7 @@ finalVictoryAudio.volume = GOAL_AUDIO_VOLUME;
 // - 1º ao 4º gol no modo CPU: 80%.
 // - 5º gol / título: 100%.
 // - Vitória por tempo/desconexão: 100%.
-// - 5 turnos completos sem gol: 60%.
+// - 15 turnos completos sem gol: 60%.
 // - Peça alinhada a até 4 movimentos do gol: 50%.
 // Comentários de gol têm prioridade máxima e interrompem qualquer
 // outra fala do comentarista que esteja tocando ou aguardando.
@@ -520,7 +520,7 @@ const commentaryAudioGroups = {
         "audios/comentarios/vict-t-cpu-3.mp3",
         "audios/comentarios/vict-t-cpu-4.mp3"
     ],
-    noGoalFiveTurns: [
+    noGoalFifteenTurns: [
         "audios/comentarios/game-no-goal-1.mp3",
         "audios/comentarios/game-no-goal-2.mp3"
     ],
@@ -792,13 +792,13 @@ function resetGoalDroughtCommentaryTracking() {
     nearGoalCommentedPieceKeys.clear();
 }
 
-function maybePlayFiveTurnsWithoutGoalCommentary() {
+function maybePlayFifteenTurnsWithoutGoalCommentary() {
     noGoalCompletedTurnCount++;
 
-    if(noGoalCompletedTurnCount < 5) return;
+    if(noGoalCompletedTurnCount < 15) return;
 
     noGoalCompletedTurnCount = 0;
-    playCommentary("noGoalFiveTurns", {
+    playCommentary("noGoalFifteenTurns", {
         chance: 0.6,
         delay: 260,
         priority: 10
@@ -12587,7 +12587,7 @@ function passTurn(reason = "normal") {
 
     // Um turno foi concluído sem gol. Avalia os comentários de ritmo
     // e de peça posicionada a até 4 movimentos do gol.
-    maybePlayFiveTurnsWithoutGoalCommentary();
+    maybePlayFifteenTurnsWithoutGoalCommentary();
     maybePlayNearGoalCommentary(outgoingPlayer);
 
     render();

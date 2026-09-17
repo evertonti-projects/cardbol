@@ -1,238 +1,269 @@
-const GOALKEEPER_ASSETS = {
-    idle: "../imagens/mini-game-penalty/1goleiro-parado.png",
-    happy: "../imagens/mini-game-penalty/1goleiro-feliz-defendeu.png",
-    sad: "../imagens/mini-game-penalty/1goleiro-triste-gol.png",
-    zones: {
-        0: "../imagens/mini-game-penalty/1goleiro-alto-esquerda.png",
-        1: "../imagens/mini-game-penalty/1goleiro-alto-centro.png",
-        2: "../imagens/mini-game-penalty/1goleiro-alto-direita.png",
-        3: "../imagens/mini-game-penalty/1goleiro-baixo-esquerda.png",
-        4: "../imagens/mini-game-penalty/1goleiro-baixo-centro.png",
-        5: "../imagens/mini-game-penalty/1goleiro-baixo-direita.png"
-    }
+const SCENE_W = 1672;
+const SCENE_H = 941;
+
+const ASSETS = {
+  idle: "../imagens/mini-game-penalty/1goleiro-parado.png",
+  happy: "../imagens/mini-game-penalty/1goleiro-feliz-defendeu.png",
+  sad: "../imagens/mini-game-penalty/1goleiro-triste-gol.png",
+  zones: [
+    "../imagens/mini-game-penalty/1goleiro-alto-esquerda.png",
+    "../imagens/mini-game-penalty/1goleiro-alto-centro.png",
+    "../imagens/mini-game-penalty/1goleiro-alto-direita.png",
+    "../imagens/mini-game-penalty/1goleiro-baixo-esquerda.png",
+    "../imagens/mini-game-penalty/1goleiro-baixo-centro.png",
+    "../imagens/mini-game-penalty/1goleiro-baixo-direita.png"
+  ]
 };
 
-let penaltyShotLocked = false;
-let penaltyCpuZone = 0;
-let penaltyGoals = 0;
-let penaltySaves = 0;
-let penaltyTimers = [];
+let shotLocked = false;
+let cpuZone = 0;
+let goals = 0;
+let saves = 0;
+let timers = [];
 
 const $ = (id) => document.getElementById(id);
-const qs = (selector) => document.querySelector(selector);
+const qs = (sel) => document.querySelector(sel);
 
-function schedulePenalty(fn, delay) {
-    const timer = setTimeout(fn, delay);
-    penaltyTimers.push(timer);
-    return timer;
+function schedule(fn, delay) {
+  const t = setTimeout(fn, delay);
+  timers.push(t);
+  return t;
+}
+function clearTimers() {
+  timers.forEach(clearTimeout);
+  timers = [];
+}
+function randZone() { return Math.floor(Math.random() * 6); }
+
+function fitScene() {
+  const viewport = $("sceneViewport");
+  const scene = $("sceneCanvas");
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const scale = Math.max(vw / SCENE_W, vh / SCENE_H);
+  const w = SCENE_W * scale;
+  const h = SCENE_H * scale;
+  scene.style.width = `${w}px`;
+  scene.style.height = `${h}px`;
+  scene.style.left = `${(vw - w) / 2}px`;
+  scene.style.top = `${(vh - h) / 2}px`;
 }
 
-function clearPenaltyTimers() {
-    penaltyTimers.forEach(clearTimeout);
-    penaltyTimers = [];
+function preloadImages() {
+  [ASSETS.idle, ASSETS.happy, ASSETS.sad, ...ASSETS.zones].forEach((src) => {
+    const img = new Image();
+    img.src = src;
+  });
 }
 
-function randomPenaltyZone() {
-    return Math.floor(Math.random() * 6);
+function updateScore() {
+  $("penaltyTestScore").textContent = `GOLS ${goals} • DEFESAS ${saves}`;
 }
 
-function updatePenaltyTestScore() {
-    $("penaltyTestScore").textContent = `GOLS ${penaltyGoals} • DEFESAS ${penaltySaves}`;
+function cancelAnimations(...elements) {
+  elements.flat().forEach((el) => {
+    if (!el) return;
+    el.getAnimations().forEach((a) => a.cancel());
+    el.style.removeProperty("transform");
+    el.style.removeProperty("opacity");
+    el.style.removeProperty("filter");
+  });
 }
 
-function clearAnimations(...els) {
-    els.flat().forEach((el) => {
-        if (!el) return;
-        el.getAnimations().forEach((anim) => anim.cancel());
-        el.style.removeProperty("transform");
-        el.style.removeProperty("opacity");
-        el.style.removeProperty("filter");
+function setKeeper(src) {
+  $("penaltyGoalkeeper").src = src;
+}
+
+function resetRound() {
+  clearTimers();
+  shotLocked = false;
+  cpuZone = randZone();
+
+  const app = $("penaltyApp");
+  const keeperBox = $("keeperBox");
+  const keeperShadow = $("keeperShadow");
+  const ball = $("penaltyBall");
+  const ballShadow = $("ballShadow");
+  const result = $("penaltyResult");
+
+  cancelAnimations(keeperBox, keeperShadow, ball, ballShadow);
+  app.classList.remove("is-shooting", "impact-goal", "impact-save");
+
+  setKeeper(ASSETS.idle);
+  keeperBox.style.transform = "translate(0,0) scale(1)";
+  keeperShadow.style.transform = "translateX(-50%) scale(1)";
+  keeperShadow.style.opacity = ".34";
+  ball.style.transform = "translate(-50%, -50%) scale(1) rotate(0deg)";
+  ball.style.opacity = "1";
+  ballShadow.style.transform = "translateX(-50%) scale(1)";
+  ballShadow.style.opacity = "1";
+
+  result.className = "penalty-result";
+  result.textContent = "";
+  $("shotTitle").textContent = "ESCOLHA O CANTO";
+  $("penaltyInstruction").textContent = "Toque em um dos 6 alvos do gol.";
+  $("penaltyAgainButton").hidden = true;
+  updateScore();
+}
+
+function zoneButton(index) {
+  return qs(`.target-zone[data-zone="${index}"]`);
+}
+
+function centerDelta(fromEl, toEl) {
+  const a = fromEl.getBoundingClientRect();
+  const b = toEl.getBoundingClientRect();
+  return {
+    x: b.left + b.width / 2 - (a.left + a.width / 2),
+    y: b.top + b.height / 2 - (a.top + a.height / 2)
+  };
+}
+
+function animateBall(zoneIndex, saved) {
+  const ball = $("penaltyBall");
+  const shadow = $("ballShadow");
+  const target = zoneButton(zoneIndex).querySelector("span");
+  const { x, y } = centerDelta(ball, target);
+  const col = zoneIndex % 3;
+  const side = col === 0 ? -1 : col === 2 ? 1 : 0;
+  const high = zoneIndex < 3;
+  const curve = side * (high ? 22 : 15);
+
+  shadow.animate([
+    { transform: "translateX(-50%) scale(1)", opacity: 1 },
+    { transform: `translateX(calc(-50% + ${x * .23}px)) scale(.68)`, opacity: .35, offset: .35 },
+    { transform: `translateX(calc(-50% + ${x * .52}px)) scale(.40)`, opacity: .13, offset: .70 },
+    { transform: `translateX(calc(-50% + ${x * .66}px)) scale(.24)`, opacity: 0 }
+  ], { duration: 720, easing: "ease-out", fill: "forwards" });
+
+  const liftA = high ? -34 : -17;
+  const liftB = high ? -20 : -8;
+  const frames = [
+    { transform: "translate(-50%, -50%) translate(0,0) scale(1) rotate(0deg)" },
+    { transform: `translate(-50%, -50%) translate(${x * .24 - curve * .30}px, ${y * .24 + liftA}px) scale(.78) rotate(${135 + side * 80}deg)`, offset: .30 },
+    { transform: `translate(-50%, -50%) translate(${x * .62 - curve}px, ${y * .62 + liftB}px) scale(.50) rotate(${315 + side * 150}deg)`, offset: .72 }
+  ];
+
+  if (saved) {
+    const deflectX = side === 0 ? 34 : -side * 40;
+    frames.push({
+      transform: `translate(-50%, -50%) translate(${x * .84 + deflectX}px, ${y * .84 + 38}px) scale(.36) rotate(${590 + side * 210}deg)`,
+      opacity: .92
     });
-}
-
-function getZoneButton(zoneIndex) {
-    return qs(`.penalty-zone[data-zone="${zoneIndex}"]`);
-}
-
-function getPenaltyTargetDelta(element, zoneElement) {
-    const a = element.getBoundingClientRect();
-    const z = zoneElement.getBoundingClientRect();
-    return {
-        x: (z.left + z.width / 2) - (a.left + a.width / 2),
-        y: (z.top + z.height / 2) - (a.top + a.height / 2)
-    };
-}
-
-function setKeeperState(state) {
-    const keeper = $("penaltyGoalkeeper");
-    keeper.src = GOALKEEPER_ASSETS[state] || GOALKEEPER_ASSETS.idle;
-}
-
-function setKeeperZonePose(zoneIndex) {
-    const keeper = $("penaltyGoalkeeper");
-    keeper.src = GOALKEEPER_ASSETS.zones[zoneIndex] || GOALKEEPER_ASSETS.idle;
-}
-
-function resetPenaltyRound() {
-    clearPenaltyTimers();
-    penaltyShotLocked = false;
-    penaltyCpuZone = randomPenaltyZone();
-
-    const stage = $("penaltyStage");
-    const goalFrame = $("penaltyGoalFrame");
-    const ball = $("penaltyBall");
-    const ballShadow = $("penaltyBallShadow");
-    const keeper = $("penaltyGoalkeeper");
-    const keeperShadow = $("penaltyKeeperShadow");
-    const result = $("penaltyResult");
-    const again = $("penaltyAgainButton");
-    const instruction = $("penaltyInstruction");
-
-    clearAnimations(ball, ballShadow, keeper, keeperShadow);
-    stage.classList.remove("is-shooting", "impact-goal", "impact-save");
-    goalFrame.classList.remove("goal-hit");
-
-    setKeeperState("idle");
-    keeper.style.transform = "translateX(-50%)";
-    keeperShadow.style.transform = "translateX(-50%)";
-    keeperShadow.style.opacity = "0.34";
-    ball.style.transform = "translateX(-50%)";
-    ballShadow.style.transform = "translateX(-50%)";
-    ballShadow.style.opacity = "1";
-
-    result.className = "penalty-result";
-    result.textContent = "";
-    instruction.textContent = "A CPU já escolheu o canto do goleiro. Toque em um dos 6 alvos.";
-    again.hidden = true;
-    updatePenaltyTestScore();
-}
-
-function animateBallToZone(zoneIndex, saved) {
-    const ball = $("penaltyBall");
-    const shadow = $("penaltyBallShadow");
-    const zoneButton = getZoneButton(zoneIndex);
-    const { x, y } = getPenaltyTargetDelta(ball, zoneButton);
-    const side = (zoneIndex % 3) === 0 ? -1 : (zoneIndex % 3) === 2 ? 1 : 0;
-    const high = zoneIndex < 3;
-    const curve = side * (high ? 20 : 14);
-    const y1 = high ? -42 : -20;
-    const y2 = high ? -24 : -10;
-
-    shadow.animate([
-        { transform: "translateX(-50%) scale(1)", opacity: 1 },
-        { transform: `translateX(calc(-50% + ${x * .22}px)) translateY(${Math.max(6, y * .08)}px) scale(.68)`, opacity: .34, offset: .35 },
-        { transform: `translateX(calc(-50% + ${x * .48}px)) translateY(${Math.max(10, y * .11)}px) scale(.42)`, opacity: .14, offset: .7 },
-        { transform: `translateX(calc(-50% + ${x * .66}px)) translateY(${Math.max(14, y * .12)}px) scale(.26)`, opacity: 0 }
-    ], { duration: saved ? 760 : 720, easing: "ease-out", fill: "forwards" });
-
-    const frames = [
-        { transform: "translateX(-50%) translate(0,0) scale(1) rotate(0deg)" },
-        { transform: `translateX(-50%) translate(${x * .24 - curve * .34}px, ${y * .24 + y1}px) scale(.82) rotate(${side * 90 + 135}deg)`, offset: .3 },
-        { transform: `translateX(-50%) translate(${x * .62 - curve}px, ${y * .62 + y2}px) scale(.53) rotate(${side * 170 + 300}deg)`, offset: .72 }
-    ];
-
-    if (saved) {
-        const deflect = side === 0 ? 38 : -side * 42;
-        frames.push({ transform: `translateX(-50%) translate(${x * .86 + deflect}px, ${y * .82 + 46}px) scale(.44) rotate(${side * 230 + 560}deg)` });
-    } else {
-        frames.push({ transform: `translateX(-50%) translate(${x}px, ${y + (high ? 8 : 12)}px) scale(.29) rotate(${side * 230 + 620}deg)` });
-    }
-
-    ball.animate(frames, {
-        duration: saved ? 760 : 720,
-        easing: "cubic-bezier(.18,.74,.18,1)",
-        fill: "forwards"
+  } else {
+    frames.push({
+      transform: `translate(-50%, -50%) translate(${x}px, ${y}px) scale(.27) rotate(${630 + side * 220}deg)`
     });
+  }
+
+  ball.animate(frames, {
+    duration: saved ? 760 : 720,
+    easing: "cubic-bezier(.16,.72,.17,1)",
+    fill: "forwards"
+  });
 }
 
-function animateKeeperDive(zoneIndex) {
-    const keeper = $("penaltyGoalkeeper");
-    const shadow = $("penaltyKeeperShadow");
-    const zoneButton = getZoneButton(zoneIndex);
-    const { x, y } = getPenaltyTargetDelta(keeper, zoneButton);
-    const side = (zoneIndex % 3) === 0 ? -1 : (zoneIndex % 3) === 2 ? 1 : 0;
-    const high = zoneIndex < 3;
-    const moveX = side === 0 ? -54 : side === 1 ? 54 : 0;
-    const moveY = high ? -12 : 10;
-
-    setKeeperZonePose(zoneIndex);
-
-    shadow.animate([
-        { transform: "translateX(-50%) scale(1)", opacity: .34 },
-        { transform: `translateX(calc(-50% + ${moveX * .50}px)) scale(${high ? .68 : .78}, ${high ? .40 : .52})`, opacity: .18, offset: .58 },
-        { transform: `translateX(calc(-50% + ${moveX * .70}px)) scale(${high ? .54 : .66}, ${high ? .34 : .48})`, opacity: .12 }
-    ], { duration: 560, easing: "cubic-bezier(.16,.76,.22,1)", fill: "forwards" });
-
-    keeper.animate([
-        { transform: "translateX(-50%) translate(0,0) scale(1)" },
-        { transform: `translateX(-50%) translate(${moveX * .24}px, ${moveY * .36}px) scale(1.02)`, offset: .30 },
-        { transform: `translateX(-50%) translate(${moveX}px, ${moveY}px) scale(1.03)`, offset: .72 },
-        { transform: `translateX(-50%) translate(${moveX * .92}px, ${moveY + (high ? 2 : 4)}px) scale(1.01)` }
-    ], { duration: 560, easing: "cubic-bezier(.16,.76,.22,1)", fill: "forwards" });
+function keeperMoveForZone(zoneIndex) {
+  const col = zoneIndex % 3;
+  const high = zoneIndex < 3;
+  const side = col === 0 ? -1 : col === 2 ? 1 : 0;
+  return {
+    x: side * (high ? 6.0 : 4.2),
+    y: high ? -1.8 : 1.1,
+    shadowX: side * 4.6,
+    shadowScale: high ? .58 : .72
+  };
 }
 
-function triggerStageImpact(saved) {
-    const stage = $("penaltyStage");
-    const goalFrame = $("penaltyGoalFrame");
-    stage.classList.remove("impact-goal", "impact-save");
-    void stage.offsetWidth;
-    stage.classList.add(saved ? "impact-save" : "impact-goal");
-    if (!saved) {
-        goalFrame.classList.remove("goal-hit");
-        void goalFrame.offsetWidth;
-        goalFrame.classList.add("goal-hit");
-    }
+function animateKeeper(zoneIndex) {
+  const box = $("keeperBox");
+  const shadow = $("keeperShadow");
+  const move = keeperMoveForZone(zoneIndex);
+
+  box.animate([
+    { transform: "translate(0,0) scale(1)" },
+    { transform: "translate(0,1.1%) scale(1.02,.96)", offset: .20 },
+    { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(1.01)`, offset: .38 }
+  ], { duration: 170, easing: "ease-out", fill: "forwards" });
+
+  schedule(() => {
+    setKeeper(ASSETS.zones[zoneIndex]);
+    box.animate([
+      { transform: `translate(${move.x * .35}%, ${move.y * .35}%) scale(.98)` },
+      { transform: `translate(${move.x}%, ${move.y}%) scale(1.03)`, offset: .68 },
+      { transform: `translate(${move.x * .94}%, ${move.y + .25}%) scale(1)` }
+    ], { duration: 470, easing: "cubic-bezier(.12,.76,.20,1)", fill: "forwards" });
+  }, 135);
+
+  shadow.animate([
+    { transform: "translateX(-50%) scale(1)", opacity: .34 },
+    { transform: `translateX(calc(-50% + ${move.shadowX}%)) scale(${move.shadowScale}, .52)`, opacity: .16 }
+  ], { duration: 590, easing: "ease-out", fill: "forwards" });
 }
 
-function finishPenaltyRound(saved) {
-    if (saved) penaltySaves += 1;
-    else penaltyGoals += 1;
-
-    if (saved) setKeeperState("happy");
-    else setKeeperState("sad");
-
-    updatePenaltyTestScore();
-
-    const result = $("penaltyResult");
-    result.className = `penalty-result show ${saved ? "save" : "goal"}`;
-    result.textContent = saved ? "DEFENDEU!" : "GOOOOL!";
-    $("penaltyAgainButton").hidden = false;
-    $("penaltyInstruction").textContent = saved
-        ? "Boa defesa da CPU. Toque abaixo para cobrar novamente."
-        : "A bola entrou! Toque abaixo para cobrar novamente.";
+function impact(saved) {
+  const app = $("penaltyApp");
+  app.classList.remove("impact-goal", "impact-save");
+  void app.offsetWidth;
+  app.classList.add(saved ? "impact-save" : "impact-goal");
 }
 
-function takePenaltyShot(zoneIndex) {
-    if (penaltyShotLocked || zoneIndex < 0 || zoneIndex > 5) return;
-
-    penaltyShotLocked = true;
-    const saved = zoneIndex === penaltyCpuZone;
-    const stage = $("penaltyStage");
-    const instruction = $("penaltyInstruction");
-
-    stage.classList.add("is-shooting");
-    instruction.textContent = "CHUTE EM ANDAMENTO...";
-
-    const ball = $("penaltyBall");
-    ball.animate([
-        { transform: "translateX(-50%) scale(1)" },
-        { transform: "translateX(-50%) scale(.94)", offset: .4 },
-        { transform: "translateX(-50%) scale(1.04)" }
-    ], { duration: 180, easing: "ease-out" });
-
-    schedulePenalty(() => animateBallToZone(zoneIndex, saved), 140);
-    schedulePenalty(() => animateKeeperDive(penaltyCpuZone), 240);
-    schedulePenalty(() => triggerStageImpact(saved), 920);
-    schedulePenalty(() => finishPenaltyRound(saved), 1180);
+function showReaction(saved) {
+  const box = $("keeperBox");
+  setKeeper(saved ? ASSETS.happy : ASSETS.sad);
+  box.animate([
+    { transform: "translate(0,0) scale(.90)", opacity: .72 },
+    { transform: "translate(0,-1.0%) scale(1.08)", opacity: 1, offset: .52 },
+    { transform: "translate(0,0) scale(1)", opacity: 1 }
+  ], { duration: 430, easing: "cubic-bezier(.17,.80,.22,1.12)", fill: "forwards" });
 }
 
-document.querySelectorAll(".penalty-zone").forEach((button) => {
-    button.addEventListener("click", () => takePenaltyShot(Number(button.dataset.zone)));
+function finishRound(saved) {
+  if (saved) saves += 1;
+  else goals += 1;
+  updateScore();
+
+  const result = $("penaltyResult");
+  result.className = `penalty-result show ${saved ? "save" : "goal"}`;
+  result.textContent = saved ? "DEFENDEU!" : "GOOOOL!";
+  $("shotTitle").textContent = saved ? "DEFESA DA CPU" : "GOL DO JOGADOR";
+  $("penaltyInstruction").textContent = saved ? "O goleiro acertou o canto." : "A bola entrou!";
+  $("penaltyAgainButton").hidden = false;
+  showReaction(saved);
+}
+
+function takeShot(zoneIndex) {
+  if (shotLocked || zoneIndex < 0 || zoneIndex > 5) return;
+  shotLocked = true;
+  const saved = zoneIndex === cpuZone;
+  const app = $("penaltyApp");
+
+  app.classList.add("is-shooting");
+  $("shotTitle").textContent = "CHUTOU!";
+  $("penaltyInstruction").textContent = "Acompanhe a cobrança...";
+
+  $("penaltyBall").animate([
+    { transform: "translate(-50%, -50%) scale(1)" },
+    { transform: "translate(-50%, -50%) scale(.94)", offset: .48 },
+    { transform: "translate(-50%, -50%) scale(1.04)" }
+  ], { duration: 150, easing: "ease-out" });
+
+  schedule(() => animateBall(zoneIndex, saved), 115);
+  schedule(() => animateKeeper(cpuZone), 190);
+  schedule(() => impact(saved), 830);
+  schedule(() => finishRound(saved), 1100);
+}
+
+document.querySelectorAll(".target-zone").forEach((btn) => {
+  btn.addEventListener("click", () => takeShot(Number(btn.dataset.zone)));
 });
 
-$("penaltyAgainButton").addEventListener("click", resetPenaltyRound);
-$("penaltyBackButton").addEventListener("click", () => {
-    window.location.href = "../";
-});
+$("penaltyAgainButton").addEventListener("click", resetRound);
+$("penaltyBackButton").addEventListener("click", () => { window.location.href = "../"; });
 
-resetPenaltyRound();
+window.addEventListener("resize", fitScene);
+window.addEventListener("orientationchange", () => setTimeout(fitScene, 80));
+
+preloadImages();
+fitScene();
+resetRound();

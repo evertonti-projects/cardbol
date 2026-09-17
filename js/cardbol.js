@@ -909,6 +909,19 @@ let cpuCardUsedThisTurn = false;
 const CPU_MANAGE_RESULT_CHANCE = 0.80;
 const CPU_MANAGE_RESULT_FIRST_HALF_WINDOW_MS = 5 * 60 * 1000;
 const CPU_MANAGE_RESULT_DELAYS_MS = [10_000, 20_000, 30_000];
+
+// Tempo-base de "pensamento" da CPU em qualquer jogada importante.
+// É sempre somado ao pequeno delay técnico já existente.
+// Quando a CPU está fazendo cera, o tempo de cera é acrescentado por cima.
+const CPU_BASE_THINK_MIN_MS = 3_000;
+const CPU_BASE_THINK_MAX_MS = 7_000;
+
+function cpuRandomThinkingDelayMs() {
+    return CPU_BASE_THINK_MIN_MS + Math.floor(
+        Math.random() * (CPU_BASE_THINK_MAX_MS - CPU_BASE_THINK_MIN_MS + 1)
+    );
+}
+
 const CPU_MOOD_CHANCE = 0.40; // 2 de cada 5 turnos
 
 const CPU_TAUNT_MOODS = [
@@ -6500,10 +6513,16 @@ function scheduleCpuAfterDice(delay=700) {
 
     if(cpuActionTimer) clearTimeout(cpuActionTimer);
 
+    // Depois de ver o dado, a CPU também leva um tempo variável para
+    // analisar movimento, gol direto e eventual uso de carta pós-dado.
+    const thinkingDelay = cpuRandomThinkingDelayMs();
+    const scheduledDelay = Math.max(0, delay) + thinkingDelay;
+
     cpuThinking = true;
+    setMessage(`🤖 CPU está analisando o dado e pensando a jogada...`);
     render();
 
-    cpuActionTimer = setTimeout(cpuChooseAndMove,delay);
+    cpuActionTimer = setTimeout(cpuChooseAndMove,scheduledDelay);
 }
 
 function runCpuTurn() {
@@ -6571,17 +6590,28 @@ function scheduleCpuIfNeeded(delay=850) {
     cpuPrepareManageResultForTurn();
     cpuMaybeShowMoodForTurn();
 
-    let scheduledDelay = delay;
+    // Toda entrada de decisão da CPU recebe um tempo-base aleatório de 3–7 s.
+    // O delay recebido pela função (normalmente < 1 s) continua sendo somado.
+    const baseThinkingDelay = cpuRandomThinkingDelayMs();
+    let scheduledDelay = Math.max(0, delay) + baseThinkingDelay;
 
     if(cpuManageResultThisTurn && !cpuManageResultDelayApplied) {
         cpuManageResultDelayApplied = true;
-        scheduledDelay = cpuManageResultDelayMs;
 
-        const seconds = Math.round(cpuManageResultDelayMs / 1000);
+        // A cera é EXTRA: não substitui mais o tempo normal de pensamento.
+        scheduledDelay += cpuManageResultDelayMs;
+
+        const baseSeconds = Math.round(baseThinkingDelay / 1000);
+        const ceraSeconds = Math.round(cpuManageResultDelayMs / 1000);
+        const totalSeconds = Math.round(scheduledDelay / 1000);
+
         startCpuCeraCountdown(scheduledDelay);
         setMessage(
-            `😏 CPU entrou na retranca e está fazendo cera... pensando a jogada (${seconds}s).`
+            `😏 CPU está pensando (${baseSeconds}s) e fazendo cera (+${ceraSeconds}s)... total aproximado ${totalSeconds}s.`
         );
+    } else {
+        const seconds = Math.round(baseThinkingDelay / 1000);
+        setMessage(`🤖 CPU está pensando a jogada... (${seconds}s)`);
     }
 
     cpuThinking = true;

@@ -17,7 +17,7 @@ const ASSETS = {
 
 const KEEPER_POSE = {
   idle: { scale: .88, imgX: 0, imgY: 0 },
-  happy: { scale: 1.02, imgX: 0, imgY: -2 },
+  happy: { scale: 1.38, imgX: 0, imgY: -4 },
   sad: { scale: .90, imgX: 0, imgY: 0 },
   zones: [
     { scale: .98, imgX: -18, imgY: -8, moveX: -44, moveY: -34, shadowX: -18, shadowScale: .56 },

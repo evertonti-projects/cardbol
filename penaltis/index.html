@@ -1,90 +1,54 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Pênaltis CardBol</title>
-  <meta name="theme-color" content="#04100d">
-  <link rel="stylesheet" href="penalty.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pênaltis CardBol</title>
+    <meta name="description" content="Pênaltis CardBol - Mini game de cobranças de pênalti.">
+    <meta name="theme-color" content="#08111f">
+    <link rel="icon" href="../imagens/geral/favicon-32x32.ico" sizes="any">
+    <link rel="stylesheet" href="penalty.css">
 </head>
 <body>
-  <main class="penalty-app" id="penaltyApp">
-    <div class="scene-viewport" id="sceneViewport" aria-label="Pênaltis CardBol">
-      <div class="scene-canvas" id="sceneCanvas">
-        <img class="scene-bg" src="../imagens/mini-game-penalty/fundo5.png" alt="Estádio CardBol com gol ao centro">
+    <main class="penalty-app" id="penaltyMiniGameOverlay">
+        <header class="penalty-mini-header">
+            <button type="button" class="penalty-back-button" id="penaltyBackButton">‹ CENTRAL DE JOGOS</button>
+            <div class="penalty-mini-title-wrap">
+                <div class="penalty-mini-kicker">CARDBOL • MINI GAME</div>
+                <h1>PÊNALTIS CARDBOL</h1>
+            </div>
+            <div id="penaltyTestScore" class="penalty-test-score">GOLS 0 • DEFESAS 0</div>
+        </header>
 
-        <div class="goal-targets" id="goalTargets" aria-label="Escolha uma zona do gol">
-          <button type="button" class="target-zone" data-zone="0" aria-label="Alto à esquerda"><span></span></button>
-          <button type="button" class="target-zone" data-zone="1" aria-label="Alto ao centro"><span></span></button>
-          <button type="button" class="target-zone" data-zone="2" aria-label="Alto à direita"><span></span></button>
-          <button type="button" class="target-zone" data-zone="3" aria-label="Embaixo à esquerda"><span></span></button>
-          <button type="button" class="target-zone" data-zone="4" aria-label="Embaixo ao centro"><span></span></button>
-          <button type="button" class="target-zone" data-zone="5" aria-label="Embaixo à direita"><span></span></button>
-        </div>
+        <section class="penalty-pitch" aria-label="Campo de cobrança de pênalti">
+            <div id="penaltyGoal" class="penalty-goal" aria-label="Escolha onde chutar">
+                <div class="penalty-goal-net" aria-hidden="true"></div>
+                <div class="penalty-zones">
+                    <button type="button" class="penalty-zone" data-zone="0" aria-label="Chutar no alto à esquerda"><span>↖</span></button>
+                    <button type="button" class="penalty-zone" data-zone="1" aria-label="Chutar no alto ao centro"><span>↑</span></button>
+                    <button type="button" class="penalty-zone" data-zone="2" aria-label="Chutar no alto à direita"><span>↗</span></button>
+                    <button type="button" class="penalty-zone" data-zone="3" aria-label="Chutar embaixo à esquerda"><span>↙</span></button>
+                    <button type="button" class="penalty-zone" data-zone="4" aria-label="Chutar embaixo ao centro"><span>↓</span></button>
+                    <button type="button" class="penalty-zone" data-zone="5" aria-label="Chutar embaixo à direita"><span>↘</span></button>
+                </div>
+                <img id="penaltyGoalkeeper" src="../imagens/mini-game-penalty/goleiro-teste.png" alt="Goleiro" class="penalty-goalkeeper">
+            </div>
 
-        <div class="keeper-shadow" id="keeperShadow" aria-hidden="true"></div>
-        <div class="keeper-box" id="keeperBox" aria-hidden="true">
-          <img id="penaltyGoalkeeper" src="../imagens/mini-game-penalty/1goleiro-parado.png" alt="Goleiro">
-        </div>
+            <div class="penalty-spot" aria-hidden="true"></div>
+            <img id="penaltyBall" src="../imagens/mini-game-penalty/bola.png" alt="Bola" class="penalty-ball">
+            <img id="penaltyKicker" src="../imagens/mini-game-penalty/batedor-teste.png" alt="Batedor" class="penalty-kicker-player">
 
-        <div class="ball-shadow" id="ballShadow" aria-hidden="true"></div>
-        <img id="penaltyBall" class="penalty-ball" src="../imagens/mini-game-penalty/bola.png" alt="Bola CardBol">
-      </div>
-    </div>
+            <div id="penaltyInstruction" class="penalty-instruction">
+                A CPU já escolheu o canto do goleiro. Toque em uma das 6 zonas do gol.
+            </div>
 
-    <header class="game-hud">
-      <button type="button" class="hud-btn" id="penaltyBackButton">‹ CENTRAL DE JOGOS</button>
-      <div class="hud-center">
-        <div class="hud-title">
-          <small>CARDBOL • MINI GAME</small>
-          <strong>PÊNALTIS CARDBOL</strong>
-        </div>
-        <div class="shootout-score" aria-live="polite">
-          <span class="team-label">VOCÊ</span>
-          <b id="playerScore">0</b>
-          <span class="score-x">×</span>
-          <b id="cpuScore">0</b>
-          <span class="team-label">CPU</span>
-        </div>
-      </div>
-      <div class="timer-box" id="timerBox"><span>TEMPO</span><b id="turnTimer">7</b></div>
-    </header>
+            <div id="penaltyResult" class="penalty-result" aria-live="polite"></div>
+            <button id="penaltyAgainButton" type="button" class="penalty-again-button" hidden>
+                COBRAR NOVAMENTE
+            </button>
+        </section>
+    </main>
 
-    <section class="kick-history" id="kickHistory" aria-label="Histórico das cobranças">
-      <div class="history-side">
-        <span>VOCÊ</span>
-        <div class="history-dots" id="playerHistory"></div>
-      </div>
-      <div class="round-label" id="roundLabel">1ª COBRANÇA</div>
-      <div class="history-side cpu">
-        <div class="history-dots" id="cpuHistory"></div>
-        <span>CPU</span>
-      </div>
-    </section>
-
-    <section class="shot-hud" id="shotHud">
-      <div class="shot-title" id="shotTitle">SUA VEZ DE BATER</div>
-      <div class="shot-instruction" id="penaltyInstruction">Escolha um dos 6 cantos do gol.</div>
-
-      <div class="accuracy-wrap" id="accuracyWrap" hidden>
-        <div class="accuracy-caption"><span>RISCO</span><b>PRECISÃO</b><span>RISCO</span></div>
-        <div class="accuracy-bar" id="accuracyBar" role="meter" aria-label="Barra de precisão">
-          <div class="accuracy-marker" id="accuracyMarker"></div>
-        </div>
-        <button type="button" class="shoot-btn" id="shootButton">CHUTAR!</button>
-      </div>
-
-      <div class="hidden-defense-info" id="hiddenDefenseInfo" hidden>
-        Sua zona + <b>3 defesas secretas</b> serão ativadas.
-      </div>
-
-      <button type="button" class="again-btn" id="penaltyAgainButton" hidden>PRÓXIMA COBRANÇA</button>
-      <button type="button" class="again-btn restart" id="restartMatchButton" hidden>JOGAR NOVAMENTE</button>
-    </section>
-
-    <div class="penalty-result" id="penaltyResult" aria-live="polite"></div>
-  </main>
-
-  <script src="penalty.js"></script>
+    <script src="penalty.js"></script>
 </body>
 </html>

@@ -6984,6 +6984,9 @@ body.cardbol-level-3 .ranking-level-info strong {
     .cardbol-game-copy strong { font-size: 31px; }
     .cardbol-game-copy small { font-size: 8px; letter-spacing: 1.4px; }
     .cardbol-game-action { grid-column: 1 / -1; justify-self: stretch; justify-content: center; padding: 8px 11px; }
+    .penalty-hub-card { width: 118px; min-height: 52px; padding: 9px 10px; gap: 8px; }
+    .penalty-hub-card .cardbol-game-icon { width: 24px; height: 24px; }
+    .penalty-hub-card .cardbol-game-copy strong { font-size: 12px; }
 }
 
 @media (orientation: landscape) and (max-height: 650px) {
@@ -7014,6 +7017,9 @@ body.cardbol-level-3 .ranking-level-info strong {
     .cardbol-game-copy strong { font-size: 28px; }
     .cardbol-game-copy small { margin-top: 5px; font-size: 8px; }
     .cardbol-game-action { padding: 8px 10px; font-size: 8px; }
+    .penalty-hub-card { width: 108px; min-height: 48px; padding: 8px 9px; gap: 7px; }
+    .penalty-hub-card .cardbol-game-icon { width: 22px; height: 22px; }
+    .penalty-hub-card .cardbol-game-copy strong { font-size: 11px; }
     .cardbol-hub-footer { padding-top: 8px; font-size: 7px; }
 }
 
@@ -8659,6 +8665,7 @@ body.cardbol-level-3 .ranking-level-info strong {
 .cardbol-hub-content {
     gap: 18px;
     flex-wrap: wrap;
+    align-items: flex-start;
 }
 
 .cardbol-hub-content .cardbol-game-card {
@@ -8666,19 +8673,52 @@ body.cardbol-level-3 .ranking-level-info strong {
 }
 
 .penalty-hub-card {
-    border-color: rgba(34,197,94,.48);
+    width: min(132px, 100%);
+    min-height: 58px;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 18px;
+    align-self: center;
+    justify-self: center;
+    border-color: rgba(34,197,94,.42);
     background:
-        linear-gradient(115deg, rgba(21,128,61,.30), rgba(15,23,42,.80) 42%, rgba(5,150,105,.20));
+        linear-gradient(115deg, rgba(21,128,61,.26), rgba(15,23,42,.86) 42%, rgba(5,150,105,.14));
+    box-shadow:
+        0 10px 24px rgba(0,0,0,.28),
+        inset 0 0 18px rgba(34,197,94,.05),
+        0 0 0 1px rgba(34,197,94,.04);
+}
+
+.penalty-hub-card::before,
+.penalty-hub-card::after,
+.penalty-hub-card .cardbol-game-card-scan,
+.penalty-hub-card .cardbol-game-action,
+.penalty-hub-card .cardbol-game-copy small {
+    display: none;
 }
 
 .penalty-hub-card:hover {
-    border-color: rgba(134,239,172,.88);
-    box-shadow: 0 28px 62px rgba(0,0,0,.43), 0 0 34px rgba(34,197,94,.15), inset 0 0 35px rgba(34,197,94,.07);
+    transform: translateY(-2px) scale(1.01);
+    border-color: rgba(134,239,172,.74);
+    box-shadow: 0 14px 28px rgba(0,0,0,.34), 0 0 18px rgba(34,197,94,.10), inset 0 0 20px rgba(34,197,94,.05);
+}
+
+.penalty-hub-card .cardbol-game-copy strong {
+    font-size: 14px;
+    letter-spacing: .8px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.penalty-hub-card .cardbol-game-icon {
+    width: 28px;
+    height: 28px;
 }
 
 .penalty-hub-ball {
     border-radius: 50%;
-    filter: drop-shadow(0 0 18px rgba(255,255,255,.22));
+    filter: drop-shadow(0 0 10px rgba(255,255,255,.18));
 }
 
 .penalty-mini-overlay {

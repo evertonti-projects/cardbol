@@ -21,7 +21,7 @@ const KEEPER_POSE = {
   sad: { scale: .90, imgX: 0, imgY: 0 },
   zones: [
     { scale: .98, imgX: -18, imgY: -8, moveX: -44, moveY: -34, shadowX: -18, shadowScale: .56 },
-    { scale: .96, imgX: 0, imgY: -18, moveX: 0, moveY: -38, shadowX: 0, shadowScale: .52 },
+    { scale: 1.44, imgX: 0, imgY: -18, moveX: 0, moveY: -38, shadowX: 0, shadowScale: .52 },
     { scale: .98, imgX: 18, imgY: -8, moveX: 44, moveY: -34, shadowX: 18, shadowScale: .56 },
     { scale: .76, imgX: -24, imgY: 10, moveX: -36, moveY: 8, shadowX: -14, shadowScale: .68 },
     { scale: .74, imgX: 0, imgY: 12, moveX: 0, moveY: 10, shadowX: 0, shadowScale: .64 },
@@ -65,12 +65,15 @@ function fitScene() {
   let top;
 
   if (portrait) {
-    // No retrato mostramos a largura inteira da arte para nunca cortar as traves.
-    scale = vw / SCENE_W;
+    // No retrato usamos um preenchimento mais natural, evitando o vazio enorme na parte inferior.
+    const safeHeader = 112;
+    const safeFooter = 122;
+    const usableH = Math.max(300, vh - safeHeader - safeFooter);
+    scale = Math.max(vw / SCENE_W, usableH / SCENE_H);
     w = SCENE_W * scale;
     h = SCENE_H * scale;
-    left = 0;
-    top = Math.max(66, Math.min(108, vh * .065));
+    left = (vw - w) / 2;
+    top = Math.max(70, (vh - h) / 2 + 16);
   } else {
     // No desktop/paisagem mantemos o preenchimento total da tela.
     scale = Math.max(vw / SCENE_W, vh / SCENE_H);
@@ -136,6 +139,7 @@ function resetRound() {
   keeperShadow.style.opacity = ".34";
   ball.style.transform = "translate(-50%, -50%) scale(1) rotate(0deg)";
   ball.style.opacity = "1";
+  ball.style.zIndex = "20";
   ballShadow.style.transform = "translateX(-50%) scale(1)";
   ballShadow.style.opacity = "1";
 
@@ -164,11 +168,15 @@ function animateBall(zoneIndex, saved) {
   const ball = $("penaltyBall");
   const shadow = $("ballShadow");
   const target = zoneButton(zoneIndex).querySelector("span");
+  const keeperBox = $("keeperBox");
   const { x, y } = centerDelta(ball, target);
+  const keep = centerDelta(ball, keeperBox);
   const col = zoneIndex % 3;
   const side = col === 0 ? -1 : col === 2 ? 1 : 0;
   const high = zoneIndex < 3;
   const curve = side * (high ? 22 : 15);
+
+  schedule(() => { ball.style.zIndex = saved ? "22" : "17"; }, 250);
 
   shadow.animate([
     { transform: "translateX(-50%) scale(1)", opacity: 1 },
@@ -186,10 +194,17 @@ function animateBall(zoneIndex, saved) {
   ];
 
   if (saved) {
-    const deflectX = side === 0 ? 34 : -side * 40;
+    const catchMap = [
+      { x: keep.x - 82, y: keep.y - 58 },
+      { x: keep.x + 0, y: keep.y - 82 },
+      { x: keep.x + 82, y: keep.y - 58 },
+      { x: keep.x - 72, y: keep.y - 8 },
+      { x: keep.x + 0, y: keep.y + 8 },
+      { x: keep.x + 72, y: keep.y - 8 }
+    ][zoneIndex];
     frames.push({
-      transform: `translate(-50%, -50%) translate(${x * .84 + deflectX}px, ${y * .84 + 38}px) scale(.36) rotate(${590 + side * 210}deg)`,
-      opacity: .92
+      transform: `translate(-50%, -50%) translate(${catchMap.x}px, ${catchMap.y}px) scale(.34) rotate(${540 + side * 90}deg)`,
+      opacity: 1
     });
   } else {
     frames.push({

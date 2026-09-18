@@ -87,14 +87,13 @@ function fitScene() {
 
   let scale, w, h, left, top;
   if (portrait) {
-    const safeTop = Math.min(130, Math.max(92, vh * .09));
-    const safeBottom = Math.min(185, Math.max(135, vh * .13));
-    const usableH = Math.max(420, vh - safeTop - safeBottom);
+    const safeTop = Math.min(92, Math.max(70, vh * .12));
+    const usableH = Math.max(320, vh - safeTop);
     scale = Math.max(vw / SCENE_W, usableH / SCENE_H);
     w = SCENE_W * scale;
     h = SCENE_H * scale;
     left = (vw - w) / 2;
-    top = safeTop + Math.max(-40, (usableH - h) / 2);
+    top = safeTop + Math.max(-48, (usableH - h) / 2);
   } else {
     scale = Math.max(vw / SCENE_W, vh / SCENE_H);
     w = SCENE_W * scale;
@@ -200,6 +199,12 @@ function updateTimerUI() {
   box.classList.toggle("danger", state.decisionSeconds <= 2);
 }
 
+function setMode(mode) {
+  const app = $("penaltyApp");
+  app.classList.remove("mode-shoot","mode-defend","mode-idle");
+  app.classList.add(mode === "shoot" ? "mode-shoot" : mode === "defend" ? "mode-defend" : "mode-idle");
+}
+
 function setTargetInteractive(enabled) {
   qsa(".target-zone").forEach(btn => { btn.disabled = !enabled; });
   $("penaltyApp").classList.toggle("targets-hidden", !enabled);
@@ -212,7 +217,8 @@ function startPlayerKick() {
   $("hiddenDefenseInfo").hidden = true;
   $("penaltyAgainButton").hidden = true;
   $("restartMatchButton").hidden = true;
-  $("shotTitle").textContent = "SUA VEZ DE BATER";
+  setMode("shoot");
+  $("shotTitle").textContent = "⚽ SUA VEZ DE BATER";
   $("penaltyInstruction").textContent = "Escolha um dos 6 cantos do gol.";
   state.cpuKeeperZone = randZone();
   setTargetInteractive(true);
@@ -227,7 +233,8 @@ function selectPlayerTarget(zone, timedOut = false) {
   setTargetInteractive(false);
   state.phase = "player_power";
   $("accuracyWrap").hidden = false;
-  $("shotTitle").textContent = timedOut ? "TEMPO! CANTO SORTEADO" : "TRAVE A PRECISÃO";
+  setMode("shoot");
+  $("shotTitle").textContent = timedOut ? "⚽ TEMPO! CANTO SORTEADO" : "⚽ TRAVE A PRECISÃO";
   $("penaltyInstruction").textContent = "Toque em CHUTAR quando o marcador estiver o mais perto possível do verde.";
   startMeter();
   startCountdown(() => commitPlayerShot());
@@ -274,7 +281,8 @@ function startCpuKick() {
   $("accuracyWrap").hidden = true;
   $("hiddenDefenseInfo").hidden = false;
   $("penaltyAgainButton").hidden = true;
-  $("shotTitle").textContent = "AGORA VOCÊ DEFENDE";
+  setMode("defend");
+  $("shotTitle").textContent = "🧤 AGORA VOCÊ DEFENDE";
   $("penaltyInstruction").textContent = "Escolha 1 zona. O sistema acrescentará +3 zonas secretas de defesa.";
   setTargetInteractive(true);
   startCountdown(() => choosePlayerDefense(randZone(), true));
@@ -288,7 +296,8 @@ function choosePlayerDefense(zone, timedOut = false) {
   qsa(".target-zone").forEach(z => z.classList.toggle("selected", Number(z.dataset.zone) === zone));
   setTargetInteractive(false);
   $("hiddenDefenseInfo").hidden = true;
-  $("shotTitle").textContent = timedOut ? "TEMPO! DEFESA SORTEADA" : "CPU VAI BATER";
+  setMode("defend");
+  $("shotTitle").textContent = timedOut ? "🧤 TEMPO! DEFESA SORTEADA" : "🧤 CPU VAI BATER";
   $("penaltyInstruction").textContent = "Preparando a cobrança da CPU...";
 
   schedule(() => {
@@ -386,7 +395,8 @@ function showReaction(saved) {
 function playShot({shooter,zone,keeperZone,saved,isOut}) {
   state.phase="animating";
   const app=$("penaltyApp"); app.classList.add("is-shooting","targets-hidden");
-  $("shotTitle").textContent = shooter==="player" ? "CHUTOU!" : "CPU CHUTOU!";
+  setMode("idle");
+  $("shotTitle").textContent = shooter==="player" ? "⚽ CHUTE EM ANDAMENTO" : "🧤 DEFESA EM ANDAMENTO";
   $("penaltyInstruction").textContent = "Acompanhe a cobrança...";
 
   $("penaltyBall").animate([
@@ -430,7 +440,8 @@ function finishShot({shooter,saved,isOut}) {
   }
 
   state.nextSide = shooter === "player" ? "cpu" : "player";
-  $("shotTitle").textContent = shooter==="player" ? "FIM DA SUA COBRANÇA" : "FIM DA COBRANÇA DA CPU";
+  setMode("idle");
+  $("shotTitle").textContent = shooter==="player" ? "RESOLUÇÃO DA COBRANÇA" : "RESOLUÇÃO DA COBRANÇA";
   $("penaltyInstruction").textContent = state.nextSide==="player" ? "Agora você volta para o ataque." : "Agora é sua vez de defender.";
   $("penaltyAgainButton").hidden=false;
 }
@@ -457,7 +468,8 @@ function evaluateWinner() {
 function showGameOver(winner) {
   state.gameOver=true; state.phase="gameover"; clearTimers(); setTimerVisible(false); setTargetInteractive(false);
   $("penaltyAgainButton").hidden=true; $("restartMatchButton").hidden=false;
-  $("shotTitle").textContent = winner==="player" ? "VOCÊ VENCEU!" : "CPU VENCEU";
+  setMode("idle");
+  $("shotTitle").textContent = winner==="player" ? "🏆 VOCÊ VENCEU!" : "🏁 CPU VENCEU";
   $("penaltyInstruction").textContent = state.suddenDeath ? "Decisão nas cobranças alternadas." : "Fim da disputa de pênaltis.";
   const result=$("penaltyResult"); result.className="penalty-result show champion";
   result.textContent = winner==="player" ? "CAMPEÃO! 🏆" : "FIM DE JOGO";
